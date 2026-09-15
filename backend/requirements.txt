@@ -5,3 +5,6 @@ pydantic-settings
 httpx
 python-dotenv
 groq
+langgraph
+langchain
+langchain-groq
