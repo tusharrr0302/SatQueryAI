@@ -74,14 +74,13 @@ Return only the structured AnalysisRequest.
 
         return response.choices[0].message.content
 
-def request_tool_call(self, analysis_request: dict, tools: list):
-
-    response = self.client.chat.completions.create(
-        model=settings.GROQ_MODEL,
-        messages=[
-            {
-                "role": "system",
-                "content": """
+    def request_tool_call(self, analysis_request: dict, tools: list):
+        response = self.client.chat.completions.create(
+            model=settings.GROQ_MODEL,
+            messages=[
+                {
+                    "role": "system",
+                    "content": """
 You are the execution planner for SatQuery AI.
 
 You are given a validated AnalysisRequest.
@@ -93,15 +92,15 @@ Do not invent models or datasets.
 Use exactly the model and datasets provided
 in the AnalysisRequest.
 """
-            },
-            {
-                "role": "user",
-                "content": str(analysis_request)
-            }
-        ],
-        tools=tools,
-        tool_choice="required",
-        temperature=0
-    )
+                },
+                {
+                    "role": "user",
+                    "content": str(analysis_request)
+                }
+            ],
+            tools=tools,
+            tool_choice="required",
+            temperature=0
+        )
 
-    return response.choices[0].message
+        return response.choices[0].message
