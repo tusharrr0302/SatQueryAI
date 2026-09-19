@@ -8,3 +8,9 @@ groq
 langgraph
 langchain
 langchain-groq
+pystac-client
+planetary-computer
+rasterio
+rioxarray
+numpy
+Pillow

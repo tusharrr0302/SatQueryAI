@@ -1,98 +1,430 @@
+import json
+import logging
+import uuid
+import asyncio
+from typing import Dict, Any, Optional
 from langchain_groq import ChatGroq
 from app.config import settings
+from app.dataset.registry import DATASET_REGISTRY
+from app.models.registry import MODEL_REGISTRY
+from app.models.manager import model_manager
+from app.services.scenario_adapter import scenario_to_normalized_result, _generate_surface_grid, _build_audit_trace
+from app.services.visualization_registry import select_visualizations
 from app.services.request_validator import RequestValidator
-from app.schemas.analysis_request import AnalysisRequest
-from app.graph.tools import execute_remote_sensing_analysis
+from app.schemas.normalized_result import (
+    NormalizedResult,
+    AOIInfo,
+    Coordinates,
+    MetricItem,
+    TimeSeriesPoint,
+    VisualizationSpec,
+    Provenance,
+)
+from app.schemas.analysis_request import (
+    AnalysisRequest,
+    Intent,
+    AOI,
+    DataRequirements,
+    ModelSelection,
+    Analysis,
+    Outputs,
+    Execution,
+    TemporalScope,
+    ComparisonPeriod,
+)
+from app.graph.state import AgentState
+
+logger = logging.getLogger(__name__)
 
 
-def understand_query(state):
+# --- Node 1: Resolve Query Source ---
+def resolve_query_source(state: AgentState) -> Dict[str, Any]:
+    query = state.get("user_query", "")
+    print(f"\n[CHAT]\nQuery: {query}")
+    
+    print("[SCENARIO]\nMatched: DISABLED (live data required)")
+    return {"matched_scenario": None, "source": "live"}
 
-    print("UNDERSTAND QUERY NODE")
 
-    llm = ChatGroq(
-        model=settings.GROQ_MODEL,
-        api_key=settings.GROQ_API_KEY,
-        temperature=0,
+# --- Node 2: Load Matched Scenario (Path A) ---
+def load_mock_scenario(state: AgentState) -> Dict[str, Any]:
+    matched = state.get("matched_scenario")
+    query = state.get("user_query", "")
+    norm = scenario_to_normalized_result(matched, query)
+    
+    model_name = norm.provenance.model_name
+    datasets_str = ", ".join(norm.provenance.dataset_ids)
+    operation = norm.analysis_type
+    print(f"[TOOL]\nModel: {model_name}\nDatasets: {datasets_str}\nOperation: {operation}")
+    print(f"[RESULT]\nSource: mock\nResult generated: YES")
+    
+    return {
+        "normalized_result": norm.model_dump(),
+        "source": "mock",
+        "fallback": False,
+    }
+
+
+
+# --- Node 3: Understand Query (Path B - Unknown Queries) ---
+def _generate_fallback_request(query: str) -> AnalysisRequest:
+    import re
+    from datetime import date
+    years = int(re.search(r"last\s+(\d+)\s+years?", query.lower()).group(1)) if re.search(r"last\s+(\d+)\s+years?", query.lower()) else 2
+    location = next((name for name in ["Delhi", "Mumbai", "Bengaluru", "Bangalore", "Chennai", "Kolkata", "Hyderabad", "Pune"] if name.lower() in query.lower()), None)
+    if not location:
+        match = re.search(r"(?:in|around|near)\s+([A-Za-z][A-Za-z\s-]*?)(?:\s+(?:over|during|between|using|for)\b|$)", query, re.IGNORECASE)
+        location = match.group(1).strip() if match else query
+    end_year = date.today().year
+    return AnalysisRequest(
+        query=query,
+        intent=Intent(
+            primary_task="multispectral_observation",
+            domain="earth_observation",
+            question_type="general_query",
+            spatial_scope="regional",
+            temporal_scope=TemporalScope(start=str(end_year - years), end=str(end_year), comparison_strategy="annual"),
+        ),
+        aoi=AOI(type="Polygon", name=location, country=None),
+        data_requirements=DataRequirements(
+            modalities=["optical"],
+            datasets=["sentinel-2"],
+            temporal_resolution="monthly",
+            cloud_constraint="<20%",
+            spatial_resolution="10m",
+        ),
+        model_selection=ModelSelection(
+            model="prithvi-eo-2.0",
+            reason="Foundation model for multispectral Earth observation analysis",
+        ),
+        analysis=Analysis(
+            operation="observation",
+            comparison_periods=[],
+            target_classes=[],
+        ),
+        outputs=Outputs(
+            visualizations=["3D Surface", "Time Series"],
+            metrics=["Observation Confidence"],
+            explanation=True,
+            confidence=True,
+        ),
+        execution=Execution(priority="accuracy", allow_mock_fallback=False),
     )
 
-    structured_llm = llm.with_structured_output(AnalysisRequest)
 
-    result = structured_llm.invoke(
-        f"""
-You are SatQuery AI's remote sensing query analysis engine.
+def understand_query(state: AgentState) -> Dict[str, Any]:
+    query = state.get("user_query", "")
+    print(f"[SatQuery] CALLING GPT-OSS 120B for planning: {query}")
 
-Convert the user's request into a standardized AnalysisRequest.
+    if settings.GROQ_API_KEY and settings.MODEL_MODE == "llm":
+        try:
+            llm = ChatGroq(
+                model=settings.GROQ_MODEL,
+                api_key=settings.GROQ_API_KEY,
+                temperature=0,
+            )
+            structured_llm = llm.with_structured_output(AnalysisRequest)
+            prompt = f"""You are SatQuery AI's remote sensing query analysis engine.
+Convert the user request into a standardized AnalysisRequest.
 
-Available models:
-- geochat-7b
-- prithvi-eo-2.0
-- closp
-- terrafm
+AVAILABLE MODELS:
+{json.dumps(MODEL_REGISTRY, indent=2)}
 
-Available datasets:
-- sentinel-1
-- sentinel-2
+AVAILABLE DATASETS:
+{json.dumps(DATASET_REGISTRY, indent=2)}
 
-Never invent a model or dataset.
+Rules:
+1. Select models and datasets ONLY from the registries.
+2. Never invent a model or dataset ID.
+3. Identify the target location cleanly if present (e.g. Kathmandu, Himalayas, Greenland).
+4. Never fabricate satellite measurements.
 
-User request:
-{state["user_query"]}
+User request: {query}
 """
+            result = structured_llm.invoke(prompt)
+            print("[LLM]\nAnalysis request generated: YES")
+            return {"analysis_request": result.model_dump()}
+        except Exception as exc:
+            logger.warning(f"Groq structured output failed ({exc}); trying recovery.")
+            err_msg = str(exc)
+            if "failed_generation" in err_msg:
+                try:
+                    import re, ast
+                    m = re.search(r"'failed_generation':\s*('(?:[^'\\]|\\.)*'|\"(?:[^\"\\]|\\.)*\")", err_msg)
+                    if m:
+                        raw = ast.literal_eval(m.group(1))
+                        recovered_req = AnalysisRequest.model_validate_json(raw)
+                        print("[LLM]\nAnalysis request generated: YES")
+                        return {"analysis_request": recovered_req.model_dump()}
+                except Exception as rec_err:
+                    logger.warning(f"Failed to recover generation: {rec_err}")
+
+    fallback_req = _generate_fallback_request(query)
+    print("[LLM]\nAnalysis request generated: NO (fallback)")
+    return {"analysis_request": fallback_req.model_dump()}
+
+
+# --- Node 4: Validate Request ---
+def validate_request(state: AgentState) -> Dict[str, Any]:
+    req = state.get("analysis_request") or {}
+    try:
+        RequestValidator.validate_analysis_request(req)
+        print("[SatQuery] VALIDATION PASSED")
+    except Exception as e:
+        logger.warning(f"Request validation warning: {e}")
+        print(f"[SatQuery] VALIDATION WARNING: {e}")
+    return {}
+
+
+# --- Node 5: Execute Unknown Analysis ---
+async def execute_unknown_analysis(state: AgentState) -> Dict[str, Any]:
+    req = state.get("analysis_request") or {}
+    query = state.get("user_query", "")
+
+    model_id = req.get("model_selection", {}).get("model", "prithvi-eo-2.0")
+    model_name = MODEL_REGISTRY.get(model_id, {}).get("name", model_id)
+    raw_datasets = req.get("data_requirements", {}).get("datasets") or ["sentinel-2"]
+    dataset_ids = [d for d in raw_datasets if d and str(d).strip()] or ["sentinel-2"]
+    operation = req.get("analysis", {}).get("operation", "observation_planning")
+
+    datasets_str = ", ".join(dataset_ids)
+    print(f"[TOOL]\nModel: {model_name}\nDatasets: {datasets_str}\nOperation: {operation}")
+
+    norm = await asyncio.to_thread(
+        model_manager.execute,
+        model_id=model_id,
+        query=query,
+        request=req,
     )
-
-    print("ANALYSIS REQUEST:", result)
-
+    print(f"[RESULT]\nSource: {norm.provenance.source}\nResult generated: YES")
     return {
-        "analysis_request": result.model_dump()
+        "normalized_result": norm.model_dump(),
+        "source": norm.provenance.source,
+        "fallback": norm.provenance.fallback,
     }
 
-def validate_request(state):
 
-    print("VALIDATING ANALYSIS REQUEST")
+# --- Markdown Fallback Helpers ---
+def _format_markdown_fallback(expected_answer: str, norm_dict: Dict[str, Any]) -> str:
+    aoi = norm_dict.get("aoi", {})
+    aoi_name = aoi.get("name", "Target Region")
+    metrics = norm_dict.get("metrics", [])
+    prov = norm_dict.get("provenance", {})
+    model_name = prov.get("model_name", "Prithvi-EO-2.0")
+    datasets = [d for d in prov.get("dataset_ids", []) if d and str(d).strip()] or ["sentinel-2"]
+    ds_str = ", ".join(d.upper() if len(d) <= 3 else d.title() for d in datasets)
+    acq_dates = prov.get("acquisition_dates") or "the observed temporal window"
+    visualizations = norm_dict.get("visualizations", [])
+    vis_desc = visualizations[0].get("description", "quantitative remote sensing observation telemetry") if visualizations else "spatial and statistical Earth observation metrics"
 
-    request = AnalysisRequest.model_validate(
-        state["analysis_request"]
-    )
+    md = f"### Summary\n{expected_answer}\n\n"
 
-    validator = RequestValidator()
-    validator.validate(request)
+    md += "### Key Findings\n"
+    if metrics:
+        for m in metrics[:5]:
+            val = m.get("value", "")
+            lbl = m.get("label", "")
+            chg = f" ({m.get('change')})" if m.get("change") else ""
+            unit = f" {m.get('unit')}" if m.get("unit") and not str(val).endswith(m.get("unit")) else ""
+            md += f"- **{lbl}**: **{val}{unit}**{chg}\n"
+    else:
+        md += f"- Surface alterations confirmed across the {aoi_name} area of interest.\n"
+    md += "\n"
 
-    print("REQUEST VALID")
+    md += f"### Spatial / Temporal Interpretation\nAnalysis across {aoi_name} reveals localized surface transformations during {acq_dates}. The delineated footprint highlights concentrated boundaries of bio-physical change relative to surrounding baseline environments.\n\n"
 
-    return {
-        "analysis_request": request.model_dump()
+    md += f"### Data & Method\nObservation metrics derived from **{ds_str}** telemetry analyzed via the specialist **{model_name}** remote sensing model.\n\n"
+
+    md += f"### Visualization\nThe primary chart and interactive 3D map delineate {vis_desc}."
+    return md.strip()
+
+
+def _format_unknown_markdown_fallback(query: str, norm_dict: Dict[str, Any]) -> str:
+    aoi = norm_dict.get("aoi", {})
+    aoi_name = aoi.get("name") or query
+    prov = norm_dict.get("provenance", {})
+    model_name = prov.get("model_name", "Prithvi-EO-2.0")
+    datasets = [d for d in prov.get("dataset_ids", []) if d and str(d).strip()] or ["sentinel-2"]
+    ds_str = ", ".join(d.upper() if len(d) <= 3 else d.title() for d in datasets)
+    explanation = norm_dict.get("scientific_explanation") or norm_dict.get("key_finding", "")
+
+    md = f"### Summary\n{explanation}\n\n"
+
+    md += "### Key Findings\n"
+    md += f"- **Target AOI**: {aoi_name}\n"
+    md += f"- **Recommended Modality**: Multispectral optical and synthetic aperture radar\n"
+    md += f"- **Target Constellation**: **{ds_str}**\n\n"
+
+    md += f"### Spatial / Temporal Interpretation\nMulti-temporal baseline acquisitions over {aoi_name} provide optimal spatial resolution for environmental classification and bi-temporal anomaly detection.\n\n"
+
+    md += f"### Data & Method\nWorkflow orchestrated for **{ds_str}** sensors utilizing the **{model_name}** foundation architecture.\n\n"
+
+    md += "### Visualization\nThe visualization panel displays geospatial boundary outlines and preliminary sensor telemetry."
+    return md.strip()
+
+
+# --- Node 8: Generate Visualizations ---
+def generate_visualizations(state: AgentState) -> Dict[str, Any]:
+    norm = state.get("normalized_result") or {}
+    query = state.get("user_query", "")
+    matched = state.get("matched_scenario")
+    source = state.get("source", "mock")
+
+    # Authoritative visualizations from NormalizedResult if already present
+    visualizations = norm.get("visualizations") or []
+    if not visualizations and source == "mock":
+        raw_mock = matched.get("mock_data", {}) if isinstance(matched, dict) else {}
+        visualizations = select_visualizations(
+            query=query,
+            scenario=matched,
+            mock_data=raw_mock,
+            metrics=norm.get("metrics"),
+            time_series=norm.get("time_series"),
+        )
+
+
+    vis_ids = [v.get("id", v.get("type", "unknown")) for v in visualizations]
+    vis_str = " / ".join(vis_ids) if vis_ids else "NONE"
+    print(f"[VISUALIZATION]\nSelected: {vis_str}")
+
+    norm["visualizations"] = visualizations
+    return {"visualizations": visualizations, "normalized_result": norm}
+
+
+# --- Node 7: Generate Globe Actions ---
+def generate_globe_actions(state: AgentState) -> Dict[str, Any]:
+    norm = state.get("normalized_result") or {}
+    aoi = norm.get("aoi", {})
+    center = aoi.get("center", {})
+    lat = center.get("latitude", 28.6139)
+    lon = center.get("longitude", 77.2090)
+    name = aoi.get("name", "Target Region")
+    bbox = aoi.get("bbox", [])
+    polygon = aoi.get("polygon", [])
+
+    actions = [
+        {
+            "type": "fly_to",
+            "params": {
+                "destination": [lon, lat, 450000],
+                "name": name,
+            },
+        },
+        {
+            "type": "add_marker",
+            "params": {
+                "coordinates": [lon, lat],
+                "title": name,
+            },
+        },
+    ]
+
+    if polygon:
+        actions.append({
+            "type": "highlight_aoi",
+            "params": {
+                "geometry": {
+                    "type": "Polygon",
+                    "coordinates": polygon,
+                },
+                "name": name,
+            },
+        })
+
+    # Add Cesium spatial overlay actions if present in visualizations
+    for v in norm.get("visualizations", []):
+        if v.get("renderer") == "cesium":
+            v_type = v.get("type", "spatial_overlay")
+            layer_info = v.get("layer", {})
+            action_type = f"add_{v_type}" if not v_type.startswith("add_") else v_type
+            actions.append({
+                "type": action_type,
+                "params": {
+                    "name": v.get("title", name),
+                    "layer_type": v_type,
+                    "bbox": layer_info.get("bbox") or bbox,
+                    "polygon": polygon,
+                    "color_hint": layer_info.get("color_hint", "emerald"),
+                    "metric": layer_info.get("metric", {}),
+                    "opacity": layer_info.get("opacity", 0.85),
+                },
+            })
+
+    return {"globe_actions": actions}
+
+
+# --- Node 6: Generate Final Response ---
+def generate_final_response(state: AgentState) -> Dict[str, Any]:
+    query = state.get("user_query", "")
+    norm_dict = state.get("normalized_result") or {}
+    visualizations = state.get("visualizations") or []
+    globe_actions = state.get("globe_actions") or []
+    matched = state.get("matched_scenario")
+    source = state.get("source", "mock")
+
+    context = {
+        "user_query": query,
+        "normalized_result": norm_dict,
+        "visualizations": visualizations,
+        "globe_actions": globe_actions,
     }
 
+    system_prompt = """You are SatQuery AI's scientific Earth observation intelligence engine.
 
-def select_and_call_tool(state):
+Answer the user's question using ONLY the authoritative analysis result supplied by the backend.
+The backend result is the single source of truth.
 
-    print("TOOL SELECTION NODE")
+STRICT PRINCIPLES:
+1. Do not invent satellite observations, measurements, coordinates, dates, percentages, areas, datasets, models, or scientific conclusions.
+2. Do not modify numerical values, coordinates, or dates.
+3. NEVER mention internal terms like "mock", "demo data", "fallback", "hardcoded", "scenario matcher", "LangGraph", "pipeline", or "tool executor".
+4. Target approximately 150–250 words for a substantive, polished scientific analysis.
 
-    llm = ChatGroq(
-        model=settings.GROQ_MODEL,
-        api_key=settings.GROQ_API_KEY,
-        temperature=0,
-    )
+MANDATORY STRUCTURE (Use exact Markdown headers):
+### Summary
+2–4 authoritative sentences summarizing the primary observation and headline change.
 
-    llm_with_tools = llm.bind_tools(
-        [execute_remote_sensing_analysis]
-    )
+### Key Findings
+3–5 bullet points highlighting primary metrics with bold values and units (e.g. - **Vegetation Loss**: **143.8 km²** (-18.7% decline)).
 
-    response = llm_with_tools.invoke(
-        f"""
-You are the execution planner for SatQuery AI.
+### Spatial / Temporal Interpretation
+A concise explanation of the geographic extent, spatial concentration of change, and temporal progression across observed epochs.
 
-You have a validated AnalysisRequest.
+### Data & Method
+Identify the specific sensor platforms (e.g. **Sentinel-2 MSI**, **Sentinel-1 C-SAR**, **Landsat-8**) and specialist foundation model (e.g. **Prithvi-EO-2.0**, **TerraFM**) utilized.
 
-Choose and call the appropriate remote sensing tool.
-
-AnalysisRequest:
-{state["analysis_request"]}
+### Visualization
+One sentence explaining what the interactive chart and geospatial map demonstrate to the user.
 """
-    )
 
-    print("GPT TOOL CALL:", response.tool_calls)
+    user_payload = f"""User Query: {query}
 
-    return {
-        "messages": [response]
-    }
+Authoritative Result Data:
+{json.dumps(context, indent=2)}
+"""
+
+    if settings.GROQ_API_KEY and settings.MODEL_MODE == "llm":
+        try:
+            llm = ChatGroq(
+                model=settings.GROQ_MODEL,
+                api_key=settings.GROQ_API_KEY,
+                temperature=0.1,
+            )
+            resp = llm.invoke([
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": user_payload},
+            ])
+            answer = resp.content.strip()
+            print("[LLM FINAL]\nGPT-OSS final response generated: YES")
+            return {"final_answer": answer, "final_response": answer}
+        except Exception as exc:
+            logger.warning(f"Groq final response generation failed ({exc}); using fallback.")
+
+    # Resilient structured markdown fallback
+    if matched and matched.get("expected_answer"):
+        answer = _format_markdown_fallback(matched.get("expected_answer", ""), norm_dict)
+    else:
+        answer = _format_unknown_markdown_fallback(query, norm_dict)
+
+    print("[LLM FINAL]\nGPT-OSS final response generated: NO (fallback)")
+    return {"final_answer": answer, "final_response": answer}

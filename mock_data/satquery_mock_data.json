@@ -1,0 +1,986 @@
+{
+  "metadata": {
+    "version": "1.0.0",
+    "prototype_only": true,
+    "data_is_real": false,
+    "description": "SatQuery AI — deterministic mock EO scenarios for prototype demonstration",
+    "scenario_count": 50,
+    "categories": [
+      "vegetation_deforestation",
+      "urban_expansion",
+      "flooding_water",
+      "wildfire",
+      "agriculture",
+      "sar_optical",
+      "general_image_analysis",
+      "complex_multitemporal",
+      "ocean_marine",
+      "cross_domain"
+    ]
+  },
+  "scenarios": [
+    {
+      "id": "VEG-001",
+      "category": "vegetation_deforestation",
+      "question": "How much vegetation has been lost in Uttarakhand between 2020 and 2024?",
+      "location": "Uttarakhand, India",
+      "bbox": [78.0, 29.5, 80.5, 31.5],
+      "time_range": { "start": "2020", "end": "2024" },
+      "expected_tools": ["fetch_sentinel2", "calculate_ndvi", "detect_change", "calculate_area"],
+      "mock_data": {
+        "satellite": "Sentinel-2",
+        "ndvi_2020": 0.72,
+        "ndvi_2024": 0.61,
+        "vegetation_loss_km2": 143.8,
+        "vegetation_loss_percent": 18.7,
+        "primary_drivers": ["urbanization", "agricultural_expansion", "logging"],
+        "confidence": 0.91
+      },
+      "expected_answer": "Between 2020 and 2024, Uttarakhand lost approximately 143.8 km² of forest and vegetation cover, representing an 18.7% decline. Mean NDVI dropped from 0.72 to 0.61. Primary drivers include urbanisation, agricultural expansion, and logging activity in the Himalayan foothills."
+    },
+    {
+      "id": "VEG-002",
+      "category": "vegetation_deforestation",
+      "question": "Analyse Amazon deforestation rates in Para state, Brazil between 2019 and 2023.",
+      "location": "Para state, Brazil",
+      "bbox": [-55.0, -10.0, -47.0, -1.0],
+      "time_range": { "start": "2019", "end": "2023" },
+      "expected_tools": ["fetch_landsat", "calculate_ndvi", "detect_change", "calculate_area", "find_hotspots"],
+      "mock_data": {
+        "satellite": "Landsat-8/9",
+        "ndvi_2019": 0.81,
+        "ndvi_2023": 0.67,
+        "deforestation_km2": 8430.5,
+        "deforestation_percent": 12.3,
+        "hotspot_count": 47,
+        "confidence": 0.94
+      },
+      "expected_answer": "Para state experienced approximately 8,430 km² of deforestation between 2019 and 2023, a 12.3% loss. 47 active deforestation hotspots were identified. NDVI declined from 0.81 to 0.67 across the monitored area."
+    },
+    {
+      "id": "VEG-003",
+      "category": "vegetation_deforestation",
+      "question": "How has Delhi's green cover changed since 2015?",
+      "location": "Delhi, India",
+      "bbox": [76.8, 28.4, 77.4, 28.9],
+      "time_range": { "start": "2015", "end": "2024" },
+      "expected_tools": ["fetch_sentinel2", "calculate_ndvi", "detect_change", "calculate_area"],
+      "mock_data": {
+        "satellite": "Sentinel-2",
+        "green_cover_2015_km2": 298.4,
+        "green_cover_2024_km2": 201.7,
+        "loss_km2": 96.7,
+        "loss_percent": 32.4,
+        "ndvi_2015": 0.38,
+        "ndvi_2024": 0.24,
+        "confidence": 0.88
+      },
+      "expected_answer": "Delhi's green cover declined from 298.4 km² in 2015 to 201.7 km² in 2024, a loss of 96.7 km² (32.4%). Mean NDVI dropped from 0.38 to 0.24, reflecting widespread tree felling and green-space conversion to built-up land."
+    },
+    {
+      "id": "VEG-004",
+      "category": "vegetation_deforestation",
+      "question": "Is there any evidence of forest recovery in Western Ghats between 2018 and 2024?",
+      "location": "Western Ghats, India",
+      "bbox": [74.0, 8.0, 77.5, 21.0],
+      "time_range": { "start": "2018", "end": "2024" },
+      "expected_tools": ["fetch_sentinel2", "calculate_ndvi", "detect_change", "calculate_area"],
+      "mock_data": {
+        "satellite": "Sentinel-2",
+        "ndvi_2018": 0.64,
+        "ndvi_2024": 0.69,
+        "recovery_km2": 187.3,
+        "recovery_percent": 7.2,
+        "loss_km2": 42.1,
+        "net_gain_km2": 145.2,
+        "confidence": 0.87
+      },
+      "expected_answer": "The Western Ghats show net forest recovery of 145.2 km² between 2018 and 2024. Mean NDVI increased from 0.64 to 0.69. Approximately 187.3 km² of new vegetation was detected, partially offset by 42.1 km² of loss in vulnerable areas."
+    },
+    {
+      "id": "VEG-005",
+      "category": "vegetation_deforestation",
+      "question": "Compare NDVI values in Bandipur National Park in summer 2022 vs summer 2024.",
+      "location": "Bandipur National Park, Karnataka, India",
+      "bbox": [76.3, 11.5, 77.0, 11.9],
+      "time_range": { "start": "2022-06", "end": "2024-06" },
+      "expected_tools": ["fetch_sentinel2", "calculate_ndvi", "detect_change"],
+      "mock_data": {
+        "satellite": "Sentinel-2",
+        "ndvi_summer_2022": 0.74,
+        "ndvi_summer_2024": 0.71,
+        "change_percent": -4.1,
+        "area_km2": 874.2,
+        "confidence": 0.93
+      },
+      "expected_answer": "NDVI in Bandipur National Park declined slightly from 0.74 in summer 2022 to 0.71 in summer 2024, a 4.1% reduction. The park's 874 km² core area remains well-vegetated but shows marginal drying at the southern edges."
+    },
+    {
+      "id": "VEG-006",
+      "category": "vegetation_deforestation",
+      "question": "Where are the vegetation loss hotspots in Northeast India in 2023?",
+      "location": "Northeast India",
+      "bbox": [88.0, 21.5, 97.5, 29.5],
+      "time_range": { "start": "2022", "end": "2023" },
+      "expected_tools": ["fetch_viirs_modis", "calculate_ndvi", "detect_change", "find_hotspots", "generate_map_layer"],
+      "mock_data": {
+        "satellite": "MODIS/VIIRS",
+        "hotspot_count": 23,
+        "worst_district": "Dima Hasao",
+        "loss_km2": 312.4,
+        "hotspot_coordinates": [[93.1, 25.3], [92.8, 24.9], [94.2, 26.1]],
+        "confidence": 0.85
+      },
+      "expected_answer": "23 vegetation loss hotspots detected across Northeast India in 2023. The worst affected district is Dima Hasao with 312.4 km² of combined loss. Key hotspots cluster along the Assam–Meghalaya border and in Mizoram hill tracts."
+    },
+    {
+      "id": "URB-001",
+      "category": "urban_expansion",
+      "question": "How much has Delhi's built-up area increased between 2018 and 2024?",
+      "location": "Delhi NCR, India",
+      "bbox": [76.8, 28.2, 77.6, 29.0],
+      "time_range": { "start": "2018", "end": "2024" },
+      "expected_tools": ["fetch_sentinel2", "calculate_ndbi", "detect_change", "calculate_area"],
+      "mock_data": {
+        "satellite": "Sentinel-2",
+        "builtup_2018_km2": 612.3,
+        "builtup_2024_km2": 789.5,
+        "expansion_km2": 177.2,
+        "expansion_percent": 28.9,
+        "ndbi_2018": 0.12,
+        "ndbi_2024": 0.24,
+        "confidence": 0.92
+      },
+      "expected_answer": "Delhi NCR's built-up area expanded from 612.3 km² in 2018 to 789.5 km² in 2024, an increase of 177.2 km² (28.9%). NDBI rose from 0.12 to 0.24, confirming rapid impervious-surface growth along the urban fringe and in Gurugram/Faridabad corridors."
+    },
+    {
+      "id": "URB-002",
+      "category": "urban_expansion",
+      "question": "Analyse Bengaluru's urban expansion between 2010 and 2024.",
+      "location": "Bengaluru, Karnataka, India",
+      "bbox": [77.3, 12.7, 77.9, 13.3],
+      "time_range": { "start": "2010", "end": "2024" },
+      "expected_tools": ["fetch_landsat", "calculate_ndbi", "detect_change", "calculate_area"],
+      "mock_data": {
+        "satellite": "Landsat-8",
+        "builtup_2010_km2": 441.0,
+        "builtup_2024_km2": 741.2,
+        "expansion_km2": 300.2,
+        "expansion_percent": 68.1,
+        "ndbi_2010": 0.09,
+        "ndbi_2024": 0.31,
+        "lake_loss_count": 64,
+        "confidence": 0.90
+      },
+      "expected_answer": "Bengaluru expanded by 300.2 km² (68.1%) between 2010 and 2024. NDBI nearly tripled from 0.09 to 0.31. An estimated 64 lakes have been encroached or degraded during this period of IT-driven urban sprawl."
+    },
+    {
+      "id": "URB-003",
+      "category": "urban_expansion",
+      "question": "Compare urban sprawl between Hyderabad and Pune between 2015 and 2023.",
+      "location": "Hyderabad and Pune, India",
+      "bbox": [73.7, 17.2, 79.2, 18.0],
+      "time_range": { "start": "2015", "end": "2023" },
+      "expected_tools": ["fetch_sentinel2", "calculate_ndbi", "detect_change", "calculate_area"],
+      "mock_data": {
+        "hyderabad": {
+          "expansion_km2": 214.7,
+          "expansion_percent": 41.2,
+          "ndbi_change": 0.15
+        },
+        "pune": {
+          "expansion_km2": 178.3,
+          "expansion_percent": 37.6,
+          "ndbi_change": 0.13
+        },
+        "confidence": 0.89
+      },
+      "expected_answer": "Hyderabad expanded more (214.7 km², +41.2%) than Pune (178.3 km², +37.6%) between 2015 and 2023. Both cities show rapid peripheral growth, with Hyderabad expanding primarily north into Medchal district and Pune east towards Hadapsar and Wagholi."
+    },
+    {
+      "id": "URB-004",
+      "category": "urban_expansion",
+      "question": "Has Mumbai's suburban area expanded into Thane between 2016 and 2024?",
+      "location": "Mumbai–Thane, Maharashtra, India",
+      "bbox": [72.8, 19.0, 73.3, 19.4],
+      "time_range": { "start": "2016", "end": "2024" },
+      "expected_tools": ["fetch_sentinel2", "calculate_ndbi", "detect_change", "calculate_area"],
+      "mock_data": {
+        "satellite": "Sentinel-2",
+        "thane_expansion_km2": 89.4,
+        "thane_expansion_percent": 22.7,
+        "mangrove_loss_km2": 11.2,
+        "confidence": 0.91
+      },
+      "expected_answer": "Mumbai's suburban footprint has expanded significantly into Thane, growing by 89.4 km² (22.7%) between 2016 and 2024. This growth has been accompanied by 11.2 km² of mangrove loss along Thane Creek."
+    },
+    {
+      "id": "URB-005",
+      "category": "urban_expansion",
+      "question": "Map urban growth in Jaipur's outskirts between 2019 and 2024.",
+      "location": "Jaipur, Rajasthan, India",
+      "bbox": [75.6, 26.7, 76.2, 27.2],
+      "time_range": { "start": "2019", "end": "2024" },
+      "expected_tools": ["fetch_sentinel2", "calculate_ndbi", "detect_change", "calculate_area", "generate_map_layer"],
+      "mock_data": {
+        "satellite": "Sentinel-2",
+        "expansion_km2": 67.8,
+        "expansion_percent": 19.3,
+        "primary_direction": "North and East (Amer, Amber, Chomu corridors)",
+        "confidence": 0.88
+      },
+      "expected_answer": "Jaipur's urban area expanded by 67.8 km² (19.3%) between 2019 and 2024. Growth is concentrated in the north and east, particularly along the Amer-Amber and Chomu road corridors, driven by residential township development."
+    },
+    {
+      "id": "FLD-001",
+      "category": "flooding_water",
+      "question": "How much of Assam was flooded during the 2024 monsoon?",
+      "location": "Assam, India",
+      "bbox": [89.5, 24.5, 96.5, 28.0],
+      "time_range": { "start": "2024-06", "end": "2024-09" },
+      "expected_tools": ["fetch_sentinel1", "detect_water", "detect_change", "calculate_area"],
+      "mock_data": {
+        "satellite": "Sentinel-1 SAR",
+        "flooded_area_km2": 3847.6,
+        "flooded_percent_of_state": 48.9,
+        "districts_affected": 28,
+        "peak_flood_date": "2024-07-18",
+        "confidence": 0.93
+      },
+      "expected_answer": "During the 2024 monsoon, approximately 3,847.6 km² (48.9%) of Assam's surveyed area experienced flooding. 28 districts were affected, with peak inundation recorded on 18 July 2024. SAR data from Sentinel-1 was used to penetrate cloud cover."
+    },
+    {
+      "id": "FLD-002",
+      "category": "flooding_water",
+      "question": "Where are the Brahmaputra flood inundation hotspots between 2020 and 2024?",
+      "location": "Brahmaputra valley, Assam, India",
+      "bbox": [90.0, 25.5, 96.0, 27.8],
+      "time_range": { "start": "2020", "end": "2024" },
+      "expected_tools": ["fetch_sentinel1", "detect_water", "detect_change", "find_hotspots", "generate_map_layer"],
+      "mock_data": {
+        "satellite": "Sentinel-1 SAR",
+        "recurring_flood_zones_km2": 892.4,
+        "hotspot_count": 14,
+        "most_affected_district": "Morigaon",
+        "confidence": 0.90
+      },
+      "expected_answer": "14 recurring flood hotspots were identified along the Brahmaputra valley between 2020 and 2024, covering 892.4 km² of persistently inundated zones. Morigaon district is most severely affected, with annual inundation exceeding 60% of its low-lying land."
+    },
+    {
+      "id": "FLD-003",
+      "category": "flooding_water",
+      "question": "How has the Yamuna river's water extent changed during the Delhi floods of 2023?",
+      "location": "Yamuna floodplain, Delhi, India",
+      "bbox": [77.0, 28.4, 77.4, 28.8],
+      "time_range": { "start": "2023-07", "end": "2023-08" },
+      "expected_tools": ["fetch_sentinel1", "detect_water", "detect_change", "calculate_area"],
+      "mock_data": {
+        "satellite": "Sentinel-1 SAR",
+        "normal_water_km2": 3.2,
+        "flood_peak_km2": 41.7,
+        "expansion_factor": 13.0,
+        "peak_date": "2023-07-13",
+        "confidence": 0.95
+      },
+      "expected_answer": "The Yamuna's inundated area expanded 13-fold during the 2023 Delhi floods, from a normal extent of 3.2 km² to 41.7 km² at peak on 13 July 2023. The floodplain expansion affected 22 low-lying colonies along the riverbank."
+    },
+    {
+      "id": "FLD-004",
+      "category": "flooding_water",
+      "question": "Assess agricultural flooding in Punjab during 2022 monsoon.",
+      "location": "Punjab, India",
+      "bbox": [73.8, 29.5, 76.9, 32.5],
+      "time_range": { "start": "2022-07", "end": "2022-09" },
+      "expected_tools": ["fetch_sentinel1", "detect_water", "calculate_ndvi", "detect_change", "calculate_area"],
+      "mock_data": {
+        "satellite": "Sentinel-1 SAR",
+        "cropland_flooded_km2": 1243.5,
+        "cropland_flooded_percent": 14.8,
+        "crop_damage_estimate_percent": 22.3,
+        "confidence": 0.88
+      },
+      "expected_answer": "Approximately 1,243.5 km² (14.8%) of Punjab's cropland was flooded during the 2022 monsoon. Crop health indices suggest 22.3% of affected agricultural land suffered significant damage, primarily in Sangrur and Patiala districts."
+    },
+    {
+      "id": "WLD-001",
+      "category": "wildfire",
+      "question": "What was the severity and extent of California wildfires in summer 2023?",
+      "location": "California, USA",
+      "bbox": [-124.4, 32.5, -114.1, 42.0],
+      "time_range": { "start": "2023-06", "end": "2023-09" },
+      "expected_tools": ["fetch_viirs_modis", "calculate_nbr", "detect_change", "calculate_area", "find_hotspots"],
+      "mock_data": {
+        "satellite": "VIIRS/MODIS",
+        "burned_area_km2": 2847.3,
+        "high_severity_percent": 34.2,
+        "medium_severity_percent": 41.8,
+        "low_severity_percent": 24.0,
+        "fire_count": 8431,
+        "nbr_pre": 0.61,
+        "nbr_post": 0.18,
+        "confidence": 0.93
+      },
+      "expected_answer": "California experienced 2,847.3 km² of wildfire burn in summer 2023, with 34.2% classified as high severity. The Normalized Burn Ratio dropped from 0.61 pre-fire to 0.18 post-fire. 8,431 individual fire detections were recorded."
+    },
+    {
+      "id": "WLD-002",
+      "category": "wildfire",
+      "question": "How severe was the Maui wildfire in August 2023?",
+      "location": "Maui, Hawaii, USA",
+      "bbox": [-156.7, 20.5, -155.9, 21.1],
+      "time_range": { "start": "2023-08", "end": "2023-08" },
+      "expected_tools": ["fetch_sentinel2", "calculate_nbr", "detect_change", "calculate_area"],
+      "mock_data": {
+        "satellite": "Sentinel-2",
+        "burned_area_km2": 21.8,
+        "lahaina_affected_km2": 3.9,
+        "high_severity_percent": 78.4,
+        "nbr_pre": 0.42,
+        "nbr_post": -0.23,
+        "confidence": 0.96
+      },
+      "expected_answer": "The Maui wildfire burned 21.8 km², with 78.4% classified as high severity. The town of Lahaina suffered 3.9 km² of destruction. NBR fell dramatically from 0.42 to -0.23, indicating near-complete combustion of the affected area."
+    },
+    {
+      "id": "WLD-003",
+      "category": "wildfire",
+      "question": "Is there vegetation recovery in the 2019 Australian bushfire zones by 2022?",
+      "location": "New South Wales, Australia",
+      "bbox": [148.0, -38.0, 154.0, -28.0],
+      "time_range": { "start": "2019", "end": "2022" },
+      "expected_tools": ["fetch_sentinel2", "calculate_ndvi", "calculate_nbr", "detect_change"],
+      "mock_data": {
+        "satellite": "Sentinel-2",
+        "recovery_area_km2": 4312.8,
+        "recovery_percent_of_burned": 67.4,
+        "ndvi_post_fire": 0.14,
+        "ndvi_2022": 0.51,
+        "confidence": 0.90
+      },
+      "expected_answer": "By 2022, approximately 4,312.8 km² (67.4%) of the 2019 Australian bushfire zones show vegetation recovery. NDVI increased from 0.14 post-fire to 0.51 in 2022, though full canopy recovery may take another 5–10 years."
+    },
+    {
+      "id": "AGR-001",
+      "category": "agriculture",
+      "question": "Assess crop health in Punjab during the Rabi 2023–24 season.",
+      "location": "Punjab, India",
+      "bbox": [73.8, 29.5, 76.9, 32.5],
+      "time_range": { "start": "2023-11", "end": "2024-04" },
+      "expected_tools": ["fetch_sentinel2", "calculate_ndvi", "detect_change"],
+      "mock_data": {
+        "satellite": "Sentinel-2",
+        "crop_health_score": 0.78,
+        "healthy_area_percent": 82.3,
+        "stressed_area_percent": 14.7,
+        "failed_area_percent": 3.0,
+        "mean_ndvi_peak": 0.71,
+        "confidence": 0.91
+      },
+      "expected_answer": "Punjab's Rabi 2023–24 crop health is generally good, with 82.3% of cultivated area classified as healthy (mean peak NDVI 0.71). Approximately 14.7% shows moderate stress, and 3.0% failed — mostly in areas affected by waterlogging in Sangrur district."
+    },
+    {
+      "id": "AGR-002",
+      "category": "agriculture",
+      "question": "Identify irrigation stress in Maharashtra's Marathwada region in 2023.",
+      "location": "Marathwada, Maharashtra, India",
+      "bbox": [75.2, 17.8, 77.5, 19.8],
+      "time_range": { "start": "2023-03", "end": "2023-06" },
+      "expected_tools": ["fetch_sentinel2", "calculate_ndvi", "detect_water", "detect_change"],
+      "mock_data": {
+        "satellite": "Sentinel-2",
+        "stressed_area_km2": 2134.7,
+        "stressed_percent": 39.8,
+        "reservoir_storage_percent": 18.2,
+        "ndvi_below_threshold": 0.35,
+        "confidence": 0.87
+      },
+      "expected_answer": "39.8% of Marathwada's irrigated cropland (2,134.7 km²) shows irrigation stress in the 2023 pre-monsoon season. Reservoir storage levels stand at just 18.2% of capacity. NDVI values below 0.35 indicate significant crop moisture deficit."
+    },
+    {
+      "id": "AGR-003",
+      "category": "agriculture",
+      "question": "Compare wheat crop vigour in Haryana between November 2022 and November 2023.",
+      "location": "Haryana, India",
+      "bbox": [74.5, 27.6, 77.6, 30.9],
+      "time_range": { "start": "2022-11", "end": "2023-11" },
+      "expected_tools": ["fetch_sentinel2", "calculate_ndvi", "detect_change"],
+      "mock_data": {
+        "satellite": "Sentinel-2",
+        "ndvi_nov_2022": 0.54,
+        "ndvi_nov_2023": 0.61,
+        "improvement_percent": 12.9,
+        "area_improved_km2": 3421.2,
+        "confidence": 0.90
+      },
+      "expected_answer": "Haryana's wheat crop vigour improved by 12.9% from November 2022 to November 2023, with NDVI rising from 0.54 to 0.61. 3,421.2 km² of cropland shows better establishment, likely due to more timely sowing and adequate soil moisture."
+    },
+    {
+      "id": "AGR-004",
+      "category": "agriculture",
+      "question": "Assess crop productivity in the Nile Delta during the 2023 growing season.",
+      "location": "Nile Delta, Egypt",
+      "bbox": [30.2, 30.3, 32.4, 31.7],
+      "time_range": { "start": "2023-03", "end": "2023-07" },
+      "expected_tools": ["fetch_sentinel2", "calculate_ndvi", "detect_water", "detect_change"],
+      "mock_data": {
+        "satellite": "Sentinel-2",
+        "productive_area_km2": 9841.3,
+        "mean_ndvi": 0.67,
+        "water_availability_score": 0.72,
+        "salinisation_affected_km2": 412.8,
+        "confidence": 0.89
+      },
+      "expected_answer": "The Nile Delta maintains 9,841 km² of productive cropland with mean NDVI of 0.67. Water availability scored 0.72, though 412.8 km² in northern coastal areas shows salinisation effects that reduce productivity. Overall 2023 crop conditions are moderate-to-good."
+    },
+    {
+      "id": "SAR-001",
+      "category": "sar_optical",
+      "question": "Use SAR and optical data to assess Mumbai's coastline changes between 2018 and 2024.",
+      "location": "Mumbai coastline, Maharashtra, India",
+      "bbox": [72.7, 18.8, 73.0, 19.3],
+      "time_range": { "start": "2018", "end": "2024" },
+      "expected_tools": ["fetch_sentinel1", "fetch_sentinel2", "analyze_sar_optical", "detect_change", "calculate_area"],
+      "mock_data": {
+        "sar_satellite": "Sentinel-1",
+        "optical_satellite": "Sentinel-2",
+        "reclamation_km2": 4.7,
+        "erosion_km2": 1.2,
+        "net_land_gain_km2": 3.5,
+        "mangrove_change_km2": -2.8,
+        "confidence": 0.92
+      },
+      "expected_answer": "Combined SAR and optical analysis of Mumbai's coastline reveals 4.7 km² of land reclamation, 1.2 km² of coastal erosion, and 2.8 km² of mangrove loss between 2018 and 2024. Net land gain is 3.5 km², primarily from the Sewri–Nhava Sheva coastal corridor."
+    },
+    {
+      "id": "SAR-002",
+      "category": "sar_optical",
+      "question": "Analyse Odisha coastline change after Cyclone Yaas (2021).",
+      "location": "Odisha coastline, India",
+      "bbox": [84.5, 19.5, 87.5, 21.5],
+      "time_range": { "start": "2021-05", "end": "2021-06" },
+      "expected_tools": ["fetch_sentinel1", "analyze_sar", "detect_water", "detect_change", "calculate_area"],
+      "mock_data": {
+        "satellite": "Sentinel-1 SAR",
+        "storm_surge_area_km2": 892.3,
+        "coastal_erosion_km2": 28.7,
+        "aquaculture_damage_km2": 147.6,
+        "confidence": 0.93
+      },
+      "expected_answer": "Post-Cyclone Yaas SAR analysis shows 892.3 km² of storm surge inundation along the Odisha coastline. Coastal erosion totalled 28.7 km², while 147.6 km² of shrimp and fish aquaculture was damaged or destroyed."
+    },
+    {
+      "id": "SAR-003",
+      "category": "sar_optical",
+      "question": "Map flooded areas in Bangladesh's coastal belt using SAR in 2023.",
+      "location": "Bangladesh coastal belt",
+      "bbox": [88.5, 21.5, 92.8, 24.5],
+      "time_range": { "start": "2023-06", "end": "2023-09" },
+      "expected_tools": ["fetch_sentinel1", "analyze_sar", "detect_water", "detect_change", "calculate_area"],
+      "mock_data": {
+        "satellite": "Sentinel-1 SAR",
+        "inundated_km2": 6247.8,
+        "population_affected_million": 4.2,
+        "agricultural_loss_km2": 2341.5,
+        "confidence": 0.91
+      },
+      "expected_answer": "SAR analysis identifies 6,247.8 km² of coastal Bangladesh as inundated during the 2023 monsoon. An estimated 4.2 million people live within the flood extent. Agricultural losses cover 2,341.5 km² of paddy and vegetable fields."
+    },
+    {
+      "id": "IMG-001",
+      "category": "general_image_analysis",
+      "question": "Identify the land cover types visible in this satellite image.",
+      "location": "Generic",
+      "bbox": null,
+      "time_range": null,
+      "expected_tools": ["analyze_image", "analyze_optical"],
+      "mock_data": {
+        "detected_classes": [
+          {"class": "urban", "percent": 34.2},
+          {"class": "vegetation", "percent": 28.7},
+          {"class": "bare_soil", "percent": 18.4},
+          {"class": "water", "percent": 12.1},
+          {"class": "agriculture", "percent": 6.6}
+        ],
+        "confidence": 0.87
+      },
+      "expected_answer": "Land cover classification: Urban 34.2%, Vegetation 28.7%, Bare soil 18.4%, Water 12.1%, Agriculture 6.6%."
+    },
+    {
+      "id": "IMG-002",
+      "category": "general_image_analysis",
+      "question": "Identify and map water bodies in this satellite image.",
+      "location": "Generic",
+      "bbox": null,
+      "time_range": null,
+      "expected_tools": ["analyze_image", "detect_water"],
+      "mock_data": {
+        "water_area_km2": 24.3,
+        "water_body_count": 7,
+        "types": ["river", "reservoir", "seasonal_pond"],
+        "confidence": 0.94
+      },
+      "expected_answer": "7 water bodies detected with total area 24.3 km², including a river channel, 3 reservoirs, and 3 seasonal ponds."
+    },
+    {
+      "id": "CMPLX-001",
+      "category": "complex_multitemporal",
+      "question": "Find areas around Delhi where vegetation loss and urban expansion happened simultaneously between 2018 and 2024.",
+      "location": "Delhi NCR, India",
+      "bbox": [76.8, 28.2, 77.6, 29.0],
+      "time_range": { "start": "2018", "end": "2024" },
+      "expected_tools": ["fetch_multitemporal_sentinel2", "calculate_ndvi", "calculate_ndbi", "detect_change", "spatial_overlap", "calculate_area", "generate_map_layer"],
+      "mock_data": {
+        "satellite": "Sentinel-2 multitemporal",
+        "ndvi_decline_area_km2": 96.7,
+        "ndbi_increase_area_km2": 177.2,
+        "simultaneous_change_km2": 83.4,
+        "simultaneous_change_percent": 47.1,
+        "primary_zones": ["Gurugram north", "Faridabad west", "Noida south-west", "Bahadurgarh"],
+        "confidence": 0.91
+      },
+      "expected_answer": "83.4 km² of Delhi NCR shows simultaneous vegetation loss and urban expansion between 2018 and 2024 (47.1% of the vegetation-loss zone). Key conversion hotspots: Gurugram north (28.1 km²), Faridabad west (22.3 km²), Noida south-west (18.7 km²), and Bahadurgarh (14.3 km²)."
+    },
+    {
+      "id": "CMPLX-002",
+      "category": "complex_multitemporal",
+      "question": "Track the evolution of Assam floods from pre-monsoon to post-monsoon 2023.",
+      "location": "Assam, India",
+      "bbox": [89.5, 24.5, 96.5, 28.0],
+      "time_range": { "start": "2023-04", "end": "2023-11" },
+      "expected_tools": ["fetch_sentinel1", "fetch_multitemporal_sentinel2", "detect_water", "detect_change", "find_hotspots", "generate_map_layer"],
+      "mock_data": {
+        "phases": [
+          {"month": "April", "flooded_km2": 120.3},
+          {"month": "June", "flooded_km2": 1841.7},
+          {"month": "July", "flooded_km2": 3612.4},
+          {"month": "August", "flooded_km2": 2987.1},
+          {"month": "October", "flooded_km2": 341.2}
+        ],
+        "peak_month": "July",
+        "confidence": 0.92
+      },
+      "expected_answer": "Assam's 2023 flood evolution: Minimal pre-monsoon flooding (120.3 km² in April) rapidly escalated to 1,841.7 km² in June, peaking at 3,612.4 km² in July, receding through August (2,987.1 km²) and largely resolving by October (341.2 km²)."
+    },
+    {
+      "id": "CMPLX-003",
+      "category": "complex_multitemporal",
+      "question": "Analyse Bengaluru's simultaneous vegetation loss, urban growth, and lake shrinkage between 2015 and 2024.",
+      "location": "Bengaluru, Karnataka, India",
+      "bbox": [77.3, 12.7, 77.9, 13.3],
+      "time_range": { "start": "2015", "end": "2024" },
+      "expected_tools": ["fetch_multitemporal_sentinel2", "calculate_ndvi", "calculate_ndbi", "detect_water", "detect_change", "spatial_overlap", "calculate_area", "generate_map_layer"],
+      "mock_data": {
+        "vegetation_loss_km2": 184.7,
+        "urban_growth_km2": 248.3,
+        "lake_area_2015_km2": 47.3,
+        "lake_area_2024_km2": 28.9,
+        "lake_loss_km2": 18.4,
+        "overlap_all_three_km2": 31.2,
+        "confidence": 0.89
+      },
+      "expected_answer": "Bengaluru shows 184.7 km² of vegetation loss, 248.3 km² of urban growth, and 18.4 km² of lake shrinkage (47.3 → 28.9 km²) between 2015 and 2024. A critical zone of 31.2 km² experienced all three changes simultaneously — primarily in the outer ring-road belt north and east of the city."
+    },
+    {
+      "id": "CMPLX-004",
+      "category": "complex_multitemporal",
+      "question": "Track post-wildfire vegetation recovery in California's Dixie Fire zone between 2021 and 2024.",
+      "location": "Plumas and Butte counties, California, USA",
+      "bbox": [-121.4, 39.7, -120.3, 40.4],
+      "time_range": { "start": "2021-08", "end": "2024-08" },
+      "expected_tools": ["fetch_sentinel2", "calculate_ndvi", "calculate_nbr", "detect_change"],
+      "mock_data": {
+        "burn_area_km2": 3897.2,
+        "recovery_area_2024_km2": 2241.8,
+        "recovery_percent": 57.5,
+        "ndvi_post_fire": 0.08,
+        "ndvi_2024": 0.44,
+        "nbr_post_fire": -0.31,
+        "nbr_2024": 0.28,
+        "confidence": 0.91
+      },
+      "expected_answer": "Three years after the Dixie Fire (3,897.2 km² burned), 57.5% of the zone shows measurable vegetation recovery. NDVI rose from 0.08 post-fire to 0.44 in 2024; NBR recovered from -0.31 to +0.28, indicating re-establishment of chaparral and early-successional shrubs."
+    },
+    {
+      "id": "CMPLX-005",
+      "category": "complex_multitemporal",
+      "question": "Map coastal change in Sundarbans between 2015 and 2024.",
+      "location": "Sundarbans, West Bengal/Bangladesh",
+      "bbox": [88.0, 21.5, 89.5, 22.8],
+      "time_range": { "start": "2015", "end": "2024" },
+      "expected_tools": ["fetch_sentinel1", "fetch_sentinel2", "analyze_sar_optical", "detect_water", "detect_change", "calculate_area", "generate_map_layer"],
+      "mock_data": {
+        "mangrove_area_2015_km2": 4262.1,
+        "mangrove_area_2024_km2": 4018.7,
+        "mangrove_loss_km2": 243.4,
+        "coastal_erosion_km2": 87.6,
+        "accretion_km2": 41.2,
+        "sea_level_rise_mm": 3.2,
+        "confidence": 0.88
+      },
+      "expected_answer": "Sundarbans lost 243.4 km² of mangrove cover between 2015 and 2024. Coastal erosion totalled 87.6 km² while accretion added 41.2 km². Sea-level rise of approximately 3.2 mm/year is accelerating cyclone-driven erosion on the delta's seaward fringe."
+    },
+    {
+      "id": "OCN-001",
+      "category": "ocean_marine",
+      "question": "What are current wave conditions near Mumbai?",
+      "location": "Arabian Sea near Mumbai, India",
+      "bbox": [71.0, 18.0, 74.0, 20.5],
+      "time_range": { "start": "2024-06", "end": "2024-06" },
+      "expected_tools": ["fetch_ocean_data", "analyze_waves"],
+      "mock_data": {
+        "source": "ERA5 / CMEMS reanalysis mock",
+        "significant_wave_height_m": 2.1,
+        "wave_period_s": 8.4,
+        "wave_direction_deg": 248,
+        "swell_height_m": 1.7,
+        "wind_wave_height_m": 0.4,
+        "confidence": 0.90
+      },
+      "expected_answer": "Near Mumbai, significant wave height is 2.1 m with a wave period of 8.4 s. Predominant swell arrives from 248° (WSW), with a swell component of 1.7 m and local wind waves of 0.4 m. Conditions are moderate — advisory for small craft."
+    },
+    {
+      "id": "OCN-002",
+      "category": "ocean_marine",
+      "question": "What are the wind conditions over the Arabian Sea during June 2024?",
+      "location": "Arabian Sea",
+      "bbox": [55.0, 10.0, 75.0, 25.0],
+      "time_range": { "start": "2024-06", "end": "2024-06" },
+      "expected_tools": ["fetch_ocean_data", "analyze_wind"],
+      "mock_data": {
+        "source": "ERA5 reanalysis mock",
+        "mean_wind_speed_kmh": 38.7,
+        "max_gust_kmh": 54.2,
+        "wind_direction": "SW",
+        "wind_direction_deg": 225,
+        "storm_force_areas_count": 3,
+        "confidence": 0.91
+      },
+      "expected_answer": "Southwest monsoon winds dominate the Arabian Sea in June 2024, averaging 38.7 km/h (gust up to 54.2 km/h) from 225° (SW). Three zones of near-gale-force conditions (>50 km/h) are detected south of 15°N, posing hazards to maritime traffic."
+    },
+    {
+      "id": "OCN-003",
+      "category": "ocean_marine",
+      "question": "Find areas in the Arabian Sea where wave height is above 3 metres.",
+      "location": "Arabian Sea",
+      "bbox": [55.0, 5.0, 75.0, 25.0],
+      "time_range": { "start": "2024-06", "end": "2024-06" },
+      "expected_tools": ["fetch_ocean_data", "analyze_waves", "find_hotspots", "generate_map_layer"],
+      "mock_data": {
+        "source": "ERA5 / CMEMS reanalysis mock",
+        "area_above_3m_km2": 487320.0,
+        "max_wave_height_m": 5.8,
+        "hotspot_count": 4,
+        "hotspot_coordinates": [[63.4, 13.2], [67.1, 15.8], [60.8, 10.4], [70.2, 18.1]],
+        "confidence": 0.90
+      },
+      "expected_answer": "Approximately 487,320 km² of the Arabian Sea experiences wave heights exceeding 3 m during the June 2024 monsoon. Maximum recorded height is 5.8 m. Four primary high-wave zones are identified in the central and southern Arabian Sea."
+    },
+    {
+      "id": "OCN-004",
+      "category": "ocean_marine",
+      "question": "Are there unusual sea-surface temperature anomalies near Chennai?",
+      "location": "Bay of Bengal near Chennai, India",
+      "bbox": [79.0, 11.0, 82.5, 14.5],
+      "time_range": { "start": "2024-04", "end": "2024-04" },
+      "expected_tools": ["fetch_ocean_data", "analyze_sea_surface_temperature", "detect_ocean_anomaly"],
+      "mock_data": {
+        "source": "MODIS SST / ERA5 mock",
+        "mean_sst_c": 30.4,
+        "sst_anomaly_c": 1.8,
+        "anomaly_area_km2": 23400.0,
+        "is_anomalous": true,
+        "cyclone_risk": "elevated",
+        "confidence": 0.88
+      },
+      "expected_answer": "SST near Chennai shows a +1.8°C anomaly relative to climatological baseline, with mean surface temperature at 30.4°C. The anomalous warm zone covers 23,400 km². Such warm SST values elevate cyclone intensification risk in the Bay of Bengal during the pre-monsoon period."
+    },
+    {
+      "id": "OCN-005",
+      "category": "ocean_marine",
+      "question": "Compare wind and wave conditions around the Andaman Islands between November and January.",
+      "location": "Andaman Sea",
+      "bbox": [92.0, 6.0, 94.5, 14.0],
+      "time_range": { "start": "2023-11", "end": "2024-01" },
+      "expected_tools": ["fetch_ocean_data", "analyze_wind", "analyze_waves", "detect_change"],
+      "mock_data": {
+        "november": {"wind_kmh": 24.3, "wave_height_m": 1.8},
+        "december": {"wind_kmh": 18.7, "wave_height_m": 1.2},
+        "january": {"wind_kmh": 15.4, "wave_height_m": 0.9},
+        "trend": "calming NE monsoon through winter",
+        "confidence": 0.89
+      },
+      "expected_answer": "Conditions around Andaman progressively calm through winter: Wind 24.3 km/h and 1.8 m waves in November → 18.7 km/h and 1.2 m in December → 15.4 km/h and 0.9 m in January. The NE monsoon retreats, bringing fair-weather conditions ideal for marine navigation."
+    },
+    {
+      "id": "OCN-006",
+      "category": "ocean_marine",
+      "question": "Identify ocean SST hotspots in the Bay of Bengal during the 2023 cyclone season.",
+      "location": "Bay of Bengal",
+      "bbox": [80.0, 5.0, 100.0, 22.0],
+      "time_range": { "start": "2023-10", "end": "2023-12" },
+      "expected_tools": ["fetch_ocean_data", "analyze_sea_surface_temperature", "detect_ocean_anomaly", "find_hotspots", "generate_map_layer"],
+      "mock_data": {
+        "source": "MODIS SST mock",
+        "hotspot_count": 5,
+        "max_sst_c": 31.7,
+        "anomaly_peak_c": 2.4,
+        "cyclone_genesis_zones": 2,
+        "confidence": 0.90
+      },
+      "expected_answer": "Five SST hotspots exceed 30°C in the Bay of Bengal during the 2023 cyclone season, with peak SST of 31.7°C and anomaly of +2.4°C above baseline. Two zones show ideal thermodynamic conditions for tropical cyclone genesis and intensification."
+    },
+    {
+      "id": "XDOM-001",
+      "category": "cross_domain",
+      "question": "Find coastal areas near Odisha where strong winds and high waves occurred together.",
+      "location": "Odisha coast, India",
+      "bbox": [83.5, 18.5, 87.5, 21.5],
+      "time_range": { "start": "2023-10", "end": "2023-11" },
+      "expected_tools": ["fetch_ocean_data", "analyze_wind", "analyze_waves", "spatial_overlap", "find_hotspots", "generate_map_layer"],
+      "mock_data": {
+        "high_wind_area_km2": 34200.0,
+        "high_wave_area_km2": 28700.0,
+        "overlap_area_km2": 19400.0,
+        "max_wind_kmh": 78.4,
+        "max_wave_m": 4.9,
+        "cyclone_landfall": "near Puri",
+        "confidence": 0.93
+      },
+      "expected_answer": "19,400 km² of the Odisha coastal zone simultaneously experienced high winds (>60 km/h) and high waves (>3 m), focused around the Puri coast where cyclone landfall occurred. Maximum winds reached 78.4 km/h and wave heights peaked at 4.9 m."
+    },
+    {
+      "id": "XDOM-002",
+      "category": "cross_domain",
+      "question": "Find agricultural areas in Punjab showing both crop stress and flooding.",
+      "location": "Punjab, India",
+      "bbox": [73.8, 29.5, 76.9, 32.5],
+      "time_range": { "start": "2023-07", "end": "2023-09" },
+      "expected_tools": ["fetch_sentinel1", "fetch_sentinel2", "detect_water", "calculate_ndvi", "detect_change", "spatial_overlap", "calculate_area"],
+      "mock_data": {
+        "flooded_cropland_km2": 1243.5,
+        "stressed_cropland_km2": 2134.7,
+        "overlap_flood_and_stress_km2": 847.3,
+        "overlap_percent_of_cropland": 10.1,
+        "worst_district": "Sangrur",
+        "confidence": 0.90
+      },
+      "expected_answer": "847.3 km² of Punjab's cropland shows both flooding and crop stress simultaneously (10.1% of cultivated area). Sangrur district is worst affected, where waterlogged paddy fields compounded by late monsoon heat stress account for 312.4 km² of combined distress."
+    },
+    {
+      "id": "XDOM-003",
+      "category": "cross_domain",
+      "question": "Give me an environmental risk summary for Mumbai including urban growth, vegetation loss, flooding and ocean conditions.",
+      "location": "Mumbai, Maharashtra, India",
+      "bbox": [72.7, 18.8, 73.2, 19.3],
+      "time_range": { "start": "2018", "end": "2024" },
+      "expected_tools": ["fetch_multitemporal_sentinel2", "fetch_sentinel1", "fetch_ocean_data", "calculate_ndvi", "calculate_ndbi", "detect_water", "detect_change", "analyze_wind", "analyze_waves", "analyze_sea_surface_temperature", "spatial_overlap", "calculate_area", "find_hotspots", "generate_map_layer"],
+      "mock_data": {
+        "urban_growth_km2": 89.4,
+        "vegetation_loss_km2": 34.2,
+        "flood_risk_area_km2": 47.8,
+        "mangrove_loss_km2": 11.2,
+        "sst_anomaly_c": 1.2,
+        "wave_height_m": 2.1,
+        "risk_score": 0.74,
+        "confidence": 0.88
+      },
+      "expected_answer": "Mumbai Environmental Risk Summary (2018–2024): Urban growth: +89.4 km². Vegetation loss: -34.2 km². Mangrove loss: -11.2 km². Flood-risk zone: 47.8 km². Ocean SST anomaly: +1.2°C. Current wave height: 2.1 m. Composite risk score: 0.74/1.0 (HIGH). Mumbai faces compounding risks from urban densification, ecosystem degradation, and intensifying coastal weather."
+    },
+    {
+      "id": "XDOM-004",
+      "category": "cross_domain",
+      "question": "What data would you use to investigate a cyclone affecting the Bay of Bengal?",
+      "location": "Bay of Bengal",
+      "bbox": [80.0, 5.0, 100.0, 22.0],
+      "time_range": { "start": "2023-10", "end": "2023-11" },
+      "expected_tools": ["fetch_sentinel1", "fetch_ocean_data", "analyze_wind", "analyze_waves", "analyze_sea_surface_temperature", "detect_ocean_anomaly", "find_hotspots", "detect_water", "generate_map_layer"],
+      "mock_data": {
+        "cyclone_name": "Cyclone Midhili",
+        "central_pressure_hpa": 982,
+        "max_wind_kmh": 85.0,
+        "storm_surge_m": 1.8,
+        "landfall_location": "Bangladesh coast",
+        "sst_at_genesis_c": 30.8,
+        "confidence": 0.92
+      },
+      "expected_answer": "Investigating Bay of Bengal cyclone Midhili: Sentinel-1 SAR reveals storm-surge inundation and sea-state anomalies. Ocean data shows genesis over 30.8°C SST. Peak winds 85 km/h, storm surge 1.8 m. Landfall on Bangladesh coast. Flood mapping post-landfall using SAR + optical fusion."
+    },
+    {
+      "id": "XDOM-005",
+      "category": "cross_domain",
+      "question": "Identify locations along the Odisha coast facing both high erosion risk and population exposure.",
+      "location": "Odisha coastline, India",
+      "bbox": [83.5, 18.5, 87.5, 21.5],
+      "time_range": { "start": "2015", "end": "2024" },
+      "expected_tools": ["fetch_sentinel2", "fetch_sentinel1", "analyze_sar_optical", "detect_change", "find_hotspots", "spatial_overlap", "generate_map_layer"],
+      "mock_data": {
+        "erosion_hotspots": 8,
+        "erosion_rate_m_per_year": 3.7,
+        "high_risk_population_km2": 142.3,
+        "critical_zones": ["Chilika Lake mouth", "Puri beach", "Gopalpur"],
+        "confidence": 0.89
+      },
+      "expected_answer": "8 coastal erosion hotspots along Odisha's coast erode at an average 3.7 m/year. High-risk population-exposure zones total 142.3 km². Critical areas: Chilika Lake mouth, Puri beach, and Gopalpur — all showing accelerating erosion with dense coastal settlement."
+    },
+    {
+      "id": "URB-006",
+      "category": "urban_expansion",
+      "question": "How has Chennai's urban footprint changed between 2014 and 2024?",
+      "location": "Chennai, Tamil Nadu, India",
+      "bbox": [79.9, 12.8, 80.4, 13.4],
+      "time_range": { "start": "2014", "end": "2024" },
+      "expected_tools": ["fetch_landsat", "calculate_ndbi", "detect_change", "calculate_area"],
+      "mock_data": {
+        "builtup_2014_km2": 428.7,
+        "builtup_2024_km2": 631.4,
+        "expansion_km2": 202.7,
+        "expansion_percent": 47.3,
+        "wetland_loss_km2": 28.4,
+        "confidence": 0.90
+      },
+      "expected_answer": "Chennai's urban footprint expanded by 202.7 km² (47.3%) between 2014 and 2024. Growth is concentrated along the OMR/IT corridor, Tambaram, and northern Tiruvottiyur. 28.4 km² of wetland area has been converted, increasing flood vulnerability."
+    },
+    {
+      "id": "FLD-005",
+      "category": "flooding_water",
+      "question": "Map water body expansion in Rajasthan during the 2023 monsoon.",
+      "location": "Rajasthan, India",
+      "bbox": [69.5, 23.0, 78.3, 30.2],
+      "time_range": { "start": "2023-07", "end": "2023-09" },
+      "expected_tools": ["fetch_sentinel2", "detect_water", "detect_change", "calculate_area"],
+      "mock_data": {
+        "pre_monsoon_water_km2": 412.8,
+        "peak_monsoon_water_km2": 2847.3,
+        "expansion_factor": 6.9,
+        "permanent_water_gain_km2": 187.4,
+        "confidence": 0.88
+      },
+      "expected_answer": "Rajasthan's water-body extent expanded 6.9-fold during the 2023 monsoon, from 412.8 km² (pre-monsoon) to 2,847.3 km² (peak). After receding, approximately 187.4 km² represents new or expanded permanent water bodies, primarily in the aravalli foothills."
+    },
+    {
+      "id": "AGR-005",
+      "category": "agriculture",
+      "question": "Assess crop decline in Western Uttar Pradesh between 2020 and 2023.",
+      "location": "Western Uttar Pradesh, India",
+      "bbox": [77.0, 27.0, 80.5, 29.5],
+      "time_range": { "start": "2020", "end": "2023" },
+      "expected_tools": ["fetch_sentinel2", "calculate_ndvi", "detect_change", "calculate_area"],
+      "mock_data": {
+        "crop_area_2020_km2": 18742.3,
+        "crop_area_2023_km2": 16812.1,
+        "decline_km2": 1930.2,
+        "decline_percent": 10.3,
+        "conversion_to_urban_km2": 1124.7,
+        "conversion_to_fallow_km2": 805.5,
+        "confidence": 0.88
+      },
+      "expected_answer": "Western Uttar Pradesh lost 1,930.2 km² of active cropland between 2020 and 2023 (10.3% decline). Of this, 1,124.7 km² was converted to urban/peri-urban use and 805.5 km² became fallow, partly due to groundwater depletion and farmer migration."
+    },
+    {
+      "id": "WLD-004",
+      "category": "wildfire",
+      "question": "Assess the extent and severity of Greece wildfires in summer 2023.",
+      "location": "Greece",
+      "bbox": [20.0, 35.0, 27.0, 42.0],
+      "time_range": { "start": "2023-07", "end": "2023-09" },
+      "expected_tools": ["fetch_viirs_modis", "calculate_nbr", "detect_change", "calculate_area"],
+      "mock_data": {
+        "satellite": "VIIRS/MODIS",
+        "burned_km2": 1847.3,
+        "high_severity_percent": 52.3,
+        "most_affected_region": "Evros, Rhodope",
+        "nbr_change": -0.74,
+        "confidence": 0.92
+      },
+      "expected_answer": "Greek wildfires in summer 2023 burned 1,847.3 km², with 52.3% classified as high severity. Evros and Rhodope regions in NE Greece were worst affected. The massive NBR decline of 0.74 indicates catastrophic vegetation loss across the Alexandroupolis area."
+    },
+    {
+      "id": "OCN-007",
+      "category": "ocean_marine",
+      "question": "What is the sea surface temperature trend in the Indian Ocean over the last 5 years?",
+      "location": "Indian Ocean",
+      "bbox": [40.0, -30.0, 100.0, 30.0],
+      "time_range": { "start": "2019", "end": "2024" },
+      "expected_tools": ["fetch_ocean_data", "analyze_sea_surface_temperature", "detect_ocean_anomaly", "detect_change"],
+      "mock_data": {
+        "sst_2019_c": 28.1,
+        "sst_2024_c": 29.3,
+        "warming_rate_c_per_decade": 0.24,
+        "anomaly_event_count": 7,
+        "marine_heatwave_days": 84,
+        "confidence": 0.87
+      },
+      "expected_answer": "Indian Ocean SST has increased from 28.1°C (2019) to 29.3°C (2024), a warming rate of approximately 0.24°C per decade. 7 SST anomaly events and 84 marine heatwave days were recorded in this period, intensifying coral bleaching risk across the Lakshadweep and Andaman reefs."
+    },
+    {
+      "id": "XDOM-006",
+      "category": "cross_domain",
+      "question": "Analyse the relationship between deforestation and increased flooding risk in Meghalaya between 2018 and 2023.",
+      "location": "Meghalaya, India",
+      "bbox": [89.8, 25.0, 92.9, 26.5],
+      "time_range": { "start": "2018", "end": "2023" },
+      "expected_tools": ["fetch_multitemporal_sentinel2", "fetch_sentinel1", "calculate_ndvi", "detect_water", "detect_change", "spatial_overlap", "calculate_area"],
+      "mock_data": {
+        "forest_loss_km2": 247.8,
+        "flood_frequency_increase_percent": 34.2,
+        "overlap_deforested_and_flooded_km2": 187.4,
+        "runoff_increase_estimate_percent": 28.7,
+        "confidence": 0.87
+      },
+      "expected_answer": "In Meghalaya, 247.8 km² of forest loss between 2018 and 2023 correlates strongly with a 34.2% increase in flood frequency in the same zones. 187.4 km² of deforested land also shows increased flood inundation, suggesting deforestation has increased surface runoff by an estimated 28.7%."
+    },
+    {
+      "id": "VEG-007",
+      "category": "vegetation_deforestation",
+      "question": "Is deforestation occurring around the Jim Corbett National Park buffer zone?",
+      "location": "Jim Corbett National Park, Uttarakhand, India",
+      "bbox": [78.7, 29.4, 79.2, 29.9],
+      "time_range": { "start": "2019", "end": "2024" },
+      "expected_tools": ["fetch_sentinel2", "calculate_ndvi", "detect_change", "calculate_area", "find_hotspots"],
+      "mock_data": {
+        "buffer_zone_area_km2": 487.3,
+        "loss_in_buffer_km2": 23.7,
+        "loss_percent": 4.9,
+        "hotspot_count": 6,
+        "encroachment_km2": 14.2,
+        "confidence": 0.90
+      },
+      "expected_answer": "The Jim Corbett buffer zone has experienced 23.7 km² of vegetation loss (4.9%) between 2019 and 2024. Six deforestation hotspots were identified, with 14.2 km² showing potential encroachment patterns along the eastern boundary near Ramnagar."
+    },
+    {
+      "id": "SAR-004",
+      "category": "sar_optical",
+      "question": "Compare waterlogging extent in Kolkata before and after the 2023 monsoon using SAR and optical data.",
+      "location": "Kolkata, West Bengal, India",
+      "bbox": [88.2, 22.3, 88.6, 22.7],
+      "time_range": { "start": "2023-05", "end": "2023-10" },
+      "expected_tools": ["fetch_sentinel1", "fetch_sentinel2", "analyze_sar_optical", "detect_water", "detect_change", "calculate_area"],
+      "mock_data": {
+        "pre_monsoon_waterlogged_km2": 8.4,
+        "post_monsoon_peak_km2": 47.3,
+        "expansion_factor": 5.6,
+        "drainage_recovery_days": 12,
+        "confidence": 0.91
+      },
+      "expected_answer": "Kolkata's waterlogged area expanded from 8.4 km² (pre-monsoon) to 47.3 km² at peak monsoon, a 5.6-fold increase. SAR penetrated cloud cover during peak flooding. Drainage recovery to near-baseline conditions took 12 days post-peak."
+    },
+    {
+      "id": "CMPLX-006",
+      "category": "complex_multitemporal",
+      "question": "Provide a comprehensive land cover change summary for Goa between 2010 and 2024.",
+      "location": "Goa, India",
+      "bbox": [73.6, 14.9, 74.4, 15.8],
+      "time_range": { "start": "2010", "end": "2024" },
+      "expected_tools": ["fetch_landsat", "fetch_multitemporal_sentinel2", "calculate_ndvi", "calculate_ndbi", "detect_water", "detect_change", "calculate_area", "generate_map_layer"],
+      "mock_data": {
+        "forest_change_km2": -84.3,
+        "urban_change_km2": 127.8,
+        "agriculture_change_km2": -43.7,
+        "water_change_km2": -7.2,
+        "total_area_km2": 3702.0,
+        "confidence": 0.89
+      },
+      "expected_answer": "Goa's land cover has changed substantially from 2010–2024: Forests declined by 84.3 km², urban area grew by 127.8 km², agricultural land shrank by 43.7 km², and water bodies contracted by 7.2 km². Tourism infrastructure and mining activity are the primary drivers."
+    }
+  ]
+}

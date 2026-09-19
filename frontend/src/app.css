@@ -1,0 +1,390 @@
+:root {
+  /* =========================================================
+     CORE BACKGROUNDS
+     ========================================================= */
+
+  --bg-space: #020202;
+  --bg-dark: #050505;
+  --bg-panel: #080808;
+
+  --bg-panel-translucent: rgba(8, 8, 8, 0.86);
+
+  --bg-card: #0b0b0b;
+  --bg-card-hover: #111111;
+
+  --bg-chip: rgba(255, 255, 255, 0.045);
+
+  --bg-chip-hover: rgba(255, 255, 255, 0.085);
+
+  /* =========================================================
+     MONOCHROME ACCENT SYSTEM
+     
+     Kept under the old variable names so existing
+     components using --accent-emerald don't break.
+     ========================================================= */
+
+  --accent-emerald: #ffffff;
+  --accent-emerald-light: #ffffff;
+
+  --accent-emerald-subtle: rgba(255, 255, 255, 0.07);
+
+  --accent-emerald-border: rgba(255, 255, 255, 0.18);
+
+  --accent-glow: 0 0 25px rgba(255, 255, 255, 0.08);
+
+  /* =========================================================
+     BORDERS
+     ========================================================= */
+
+  --border-subtle: rgba(255, 255, 255, 0.065);
+
+  --border-card: rgba(255, 255, 255, 0.1);
+
+  --border-emerald: rgba(255, 255, 255, 0.18);
+
+  /* =========================================================
+     TEXT
+     ========================================================= */
+
+  --text-primary: #f5f5f5;
+
+  --text-secondary: rgba(255, 255, 255, 0.52);
+
+  --text-muted: rgba(255, 255, 255, 0.28);
+
+  /* =========================================================
+     ADDITIONAL MONOCHROME TOKENS
+     ========================================================= */
+
+  --white: #ffffff;
+
+  --black: #000000;
+
+  --grey-100: rgba(255, 255, 255, 0.92);
+
+  --grey-200: rgba(255, 255, 255, 0.76);
+
+  --grey-300: rgba(255, 255, 255, 0.6);
+
+  --grey-400: rgba(255, 255, 255, 0.45);
+
+  --grey-500: rgba(255, 255, 255, 0.32);
+
+  --grey-600: rgba(255, 255, 255, 0.22);
+
+  --grey-700: rgba(255, 255, 255, 0.14);
+
+  --grey-800: rgba(255, 255, 255, 0.08);
+
+  --grey-900: rgba(255, 255, 255, 0.045);
+
+  /* =========================================================
+     GLASS
+     ========================================================= */
+
+  --glass-bg: rgba(255, 255, 255, 0.035);
+
+  --glass-bg-hover: rgba(255, 255, 255, 0.055);
+
+  --glass-border: rgba(255, 255, 255, 0.085);
+
+  --glass-border-hover: rgba(255, 255, 255, 0.15);
+
+  --glass-highlight: rgba(255, 255, 255, 0.035);
+
+  --glass-blur: 16px;
+
+  /* =========================================================
+     SHADOWS
+     ========================================================= */
+
+  --shadow-card: 0 12px 35px rgba(0, 0, 0, 0.3);
+
+  --shadow-modal: 0 30px 90px rgba(0, 0, 0, 0.65);
+
+  --shadow-soft: 0 8px 24px rgba(0, 0, 0, 0.22);
+
+  /* =========================================================
+     TYPOGRAPHY
+     ========================================================= */
+
+  --font-main:
+    "Plus Jakarta Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
+    sans-serif;
+
+  --font-mono: "Space Grotesk", "SFMono-Regular", Consolas, monospace;
+}
+
+/* =============================================================
+   GLOBAL RESET
+   ============================================================= */
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html,
+body {
+  width: 100%;
+  height: 100%;
+
+  overflow: hidden;
+
+  background-color: var(--bg-space);
+
+  color: var(--text-primary);
+
+  font-family: var(--font-main);
+
+  font-size: 14px;
+
+  line-height: 1.5;
+
+  -webkit-font-smoothing: antialiased;
+
+  -moz-osx-font-smoothing: grayscale;
+}
+
+#app {
+  width: 100%;
+  height: 100%;
+
+  display: flex;
+
+  flex-direction: column;
+
+  overflow: hidden;
+}
+
+/* =============================================================
+   SPACE BACKGROUND
+   ============================================================= */
+
+.space-stars {
+  position: relative;
+
+  background-color: #020202;
+
+  background-image:
+    radial-gradient(
+      1px 1px at 25px 35px,
+      rgba(255, 255, 255, 0.72),
+      transparent
+    ),
+    radial-gradient(
+      1px 1px at 85px 120px,
+      rgba(255, 255, 255, 0.42),
+      transparent
+    ),
+    radial-gradient(
+      1.5px 1.5px at 150px 70px,
+      rgba(255, 255, 255, 0.75),
+      transparent
+    ),
+    radial-gradient(
+      1px 1px at 220px 190px,
+      rgba(255, 255, 255, 0.34),
+      transparent
+    ),
+    radial-gradient(
+      1px 1px at 310px 140px,
+      rgba(255, 255, 255, 0.55),
+      transparent
+    ),
+    radial-gradient(
+      1.5px 1.5px at 450px 260px,
+      rgba(255, 255, 255, 0.62),
+      transparent
+    ),
+    radial-gradient(
+      1px 1px at 600px 80px,
+      rgba(255, 255, 255, 0.45),
+      transparent
+    ),
+    radial-gradient(
+      1px 1px at 750px 220px,
+      rgba(255, 255, 255, 0.52),
+      transparent
+    ),
+    radial-gradient(
+      1.5px 1.5px at 900px 150px,
+      rgba(255, 255, 255, 0.7),
+      transparent
+    ),
+    radial-gradient(
+      1px 1px at 1050px 300px,
+      rgba(255, 255, 255, 0.4),
+      transparent
+    ),
+    radial-gradient(
+      1px 1px at 1200px 95px,
+      rgba(255, 255, 255, 0.48),
+      transparent
+    ),
+    radial-gradient(
+      1.5px 1.5px at 1350px 240px,
+      rgba(255, 255, 255, 0.68),
+      transparent
+    );
+
+  background-size: 800px 800px;
+
+  background-repeat: repeat;
+}
+
+/* =============================================================
+   SUBTLE GRID
+   ============================================================= */
+
+.space-grid {
+  background-image:
+    linear-gradient(rgba(255, 255, 255, 0.018) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.018) 1px, transparent 1px);
+
+  background-size: 48px 48px;
+}
+
+/* =============================================================
+   SCROLLBARS
+   ============================================================= */
+
+::-webkit-scrollbar {
+  width: 5px;
+
+  height: 5px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.12);
+
+  border-radius: 10px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.24);
+}
+
+/* Firefox */
+
+* {
+  scrollbar-width: thin;
+
+  scrollbar-color: rgba(255, 255, 255, 0.13) transparent;
+}
+
+/* =============================================================
+   CESIUM
+   ============================================================= */
+
+.cesium-viewer {
+  width: 100% !important;
+
+  height: 100% !important;
+}
+
+.cesium-widget {
+  width: 100% !important;
+
+  height: 100% !important;
+}
+
+.cesium-widget-credits,
+.cesium-viewer-bottom,
+.cesium-viewer-toolbar {
+  display: none !important;
+}
+
+/* =============================================================
+   GLOBAL BUTTONS
+   ============================================================= */
+
+button {
+  font-family: inherit;
+
+  cursor: pointer;
+
+  border: none;
+
+  background: none;
+
+  color: inherit;
+
+  transition: all 0.15s ease;
+}
+
+button:focus-visible {
+  outline: 1px solid rgba(255, 255, 255, 0.45);
+
+  outline-offset: 2px;
+}
+
+/* =============================================================
+   INPUTS
+   ============================================================= */
+
+input,
+textarea,
+select {
+  font-family: inherit;
+
+  color: inherit;
+
+  outline: none;
+
+  border: none;
+}
+
+input::placeholder,
+textarea::placeholder {
+  color: rgba(255, 255, 255, 0.22);
+}
+
+/* =============================================================
+   GLASS UTILITY
+   ============================================================= */
+
+.glass {
+  background: var(--glass-bg);
+
+  border: 1px solid var(--glass-border);
+
+  backdrop-filter: blur(var(--glass-blur));
+
+  -webkit-backdrop-filter: blur(var(--glass-blur));
+
+  box-shadow: inset 0 1px 0 var(--glass-highlight);
+}
+
+.glass:hover {
+  background: var(--glass-bg-hover);
+
+  border-color: var(--glass-border-hover);
+}
+
+/* =============================================================
+   MONOCHROME STATUS
+   ============================================================= */
+
+.status-active {
+  color: rgba(255, 255, 255, 0.85);
+}
+
+.status-muted {
+  color: rgba(255, 255, 255, 0.28);
+}
+
+/* =============================================================
+   SELECTION
+   ============================================================= */
+
+::selection {
+  background: rgba(255, 255, 255, 0.18);
+
+  color: #ffffff;
+}

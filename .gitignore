@@ -11,6 +11,7 @@ __pycache__/
 .ruff_cache/
 
 # Virtual environments
+.venv
 .venv/
 venv/
 backend/venv/
@@ -20,6 +21,11 @@ node_modules/
 dist/
 build/
 
+# Generated runtime satellite imagery
+backend/app/static/generated/*
+!backend/app/static/generated/.gitkeep
+
 # Local editor and OS files
 .DS_Store
+*.DS_Store
 .vscode/
