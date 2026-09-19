@@ -14,3 +14,9 @@ rasterio
 rioxarray
 numpy
 Pillow
+python-multipart
+sqlalchemy>=2.0
+alembic
+psycopg2-binary
+pyjwt
+cryptography

@@ -1,8 +1,14 @@
 <script lang="ts">
-  import { showSettingsModal, userSettings } from '../stores';
+  import { showSettingsModal, userSettings, showAuthModal, authModalMode } from '../stores';
+  import { isSignedIn, currentUser, signOutUser } from '../services/authService';
   import {
     X,
     Settings,
+    User,
+    ShieldCheck,
+    LogOut,
+    LogIn,
+    ExternalLink,
   } from 'lucide-svelte';
 
   function closeModal() {
@@ -74,6 +80,81 @@
 
       <div class="modal-body">
 
+        <!-- USER ACCOUNT & IDENTITY -->
+        <div class="setting-section-title">
+          <User size={14} />
+          <span>Identity & Account</span>
+        </div>
+
+        <div class="setting-item account-setting-item">
+          {#if $isSignedIn && $currentUser}
+            <div class="account-info-box">
+              <div class="account-avatar">
+                {#if $currentUser.imageUrl}
+                  <img src={$currentUser.imageUrl} alt={$currentUser.fullName || 'User'} class="avatar-pic" />
+                {:else}
+                  <span class="avatar-text">{($currentUser.fullName || 'U').slice(0, 2).toUpperCase()}</span>
+                {/if}
+              </div>
+              <div class="account-meta">
+                <span class="account-name">{$currentUser.fullName || 'SatQuery Analyst'}</span>
+                <span class="account-email">{$currentUser.primaryEmailAddress || 'analyst@satquery.ai'}</span>
+                <span class="account-id">Clerk ID: {$currentUser.id}</span>
+              </div>
+            </div>
+
+            <div class="account-actions">
+              <button
+                class="account-action-btn"
+                on:click={() => {
+                  $authModalMode = 'user-profile';
+                  $showAuthModal = true;
+                  closeModal();
+                }}
+              >
+                <span>Manage Profile</span>
+                <ExternalLink size={12} />
+              </button>
+              <button
+                class="account-action-btn danger"
+                on:click={async () => {
+                  await signOutUser();
+                  closeModal();
+                }}
+              >
+                <LogOut size={12} />
+                <span>Sign Out</span>
+              </button>
+            </div>
+          {:else}
+            <div class="account-info-box">
+              <div class="guest-badge">
+                <ShieldCheck size={18} />
+              </div>
+              <div class="account-meta">
+                <span class="account-name">Anonymous Workstation Session</span>
+                <span class="account-desc">Sign in with Clerk to persist chats, datasets, and investigations to your private cloud profile.</span>
+              </div>
+            </div>
+
+            <button
+              class="account-login-btn"
+              on:click={() => {
+                $authModalMode = 'sign-in';
+                $showAuthModal = true;
+                closeModal();
+              }}
+            >
+              <LogIn size={13} />
+              <span>Sign In with Clerk</span>
+            </button>
+          {/if}
+        </div>
+
+        <div class="setting-section-title">
+          <Settings size={14} />
+          <span>Analysis & Visualization</span>
+        </div>
 
         <!-- MODEL EXECUTION MODE -->
 
@@ -597,6 +678,160 @@
     flex-direction: column;
 
     overflow-y: auto;
+  }
+
+  .setting-section-title {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: rgba(255, 255, 255, 0.45);
+    padding: 12px 0 6px 0;
+  }
+
+  .account-setting-item {
+    background: rgba(255, 255, 255, 0.025);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 10px;
+    padding: 14px 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    margin-bottom: 8px;
+  }
+
+  .account-info-box {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+  }
+
+  .account-avatar {
+    width: 44px;
+    height: 44px;
+    border-radius: 50%;
+    background: #1c1c1c;
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+    flex-shrink: 0;
+  }
+
+  .avatar-pic {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+  }
+
+  .avatar-text {
+    font-size: 14px;
+    font-weight: 600;
+    color: #ffffff;
+  }
+
+  .guest-badge {
+    width: 40px;
+    height: 40px;
+    border-radius: 8px;
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: rgba(255, 255, 255, 0.7);
+    flex-shrink: 0;
+  }
+
+  .account-meta {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    overflow: hidden;
+  }
+
+  .account-name {
+    font-size: 13px;
+    font-weight: 500;
+    color: #ffffff;
+  }
+
+  .account-email {
+    font-size: 11px;
+    color: rgba(255, 255, 255, 0.55);
+  }
+
+  .account-id {
+    font-size: 10px;
+    font-family: ui-monospace, monospace;
+    color: rgba(255, 255, 255, 0.35);
+  }
+
+  .account-desc {
+    font-size: 11px;
+    color: rgba(255, 255, 255, 0.5);
+    line-height: 1.4;
+  }
+
+  .account-actions {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .account-action-btn {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 12px;
+    border-radius: 6px;
+    background: rgba(255, 255, 255, 0.06);
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    color: rgba(255, 255, 255, 0.85);
+    font-size: 11px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.15s ease;
+  }
+
+  .account-action-btn:hover {
+    background: rgba(255, 255, 255, 0.12);
+    color: #ffffff;
+  }
+
+  .account-action-btn.danger {
+    color: rgba(239, 68, 68, 0.85);
+    border-color: rgba(239, 68, 68, 0.2);
+  }
+
+  .account-action-btn.danger:hover {
+    background: rgba(239, 68, 68, 0.12);
+    color: #ef4444;
+  }
+
+  .account-login-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    padding: 7px 14px;
+    border-radius: 6px;
+    background: #ffffff;
+    color: #000000;
+    border: none;
+    font-size: 12px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: opacity 0.15s ease;
+    align-self: flex-start;
+  }
+
+  .account-login-btn:hover {
+    opacity: 0.9;
   }
 
 

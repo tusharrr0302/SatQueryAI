@@ -14,6 +14,10 @@ class Settings(BaseSettings):
     IMAGE_OUTPUT_DIR: str = "app/static/generated"
     SERVICE_HOST: str = "0.0.0.0"
     SERVICE_PORT: int = 8000
+    CLERK_SECRET_KEY: Optional[str] = ""
+    CLERK_PUBLISHABLE_KEY: Optional[str] = ""
+    CLERK_JWKS_URL: Optional[str] = ""
+    DATABASE_URL: str = "sqlite:///./satquery.db"
 
     class Config:
         env_file = (".env", "backend/.env")

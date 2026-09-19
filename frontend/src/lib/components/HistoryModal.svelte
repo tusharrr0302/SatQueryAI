@@ -8,10 +8,11 @@
     currentResult,
     globeLocation,
     appViewState,
+    activeDataLayers,
     type ChatMessage,
   } from '../stores';
 
-  import { fetchConversations } from '../api';
+  import { fetchConversations, fetchConversation, deleteConversation } from '../api';
 
   import {
     Clock,
@@ -20,7 +21,8 @@
     Database,
     Cpu,
     MapPin,
-    Activity
+    Activity,
+    Trash2,
   } from 'lucide-svelte';
 
 
@@ -158,75 +160,69 @@
   // SELECT CONVERSATION
   // =========================================================
 
-  function handleSelect(conv: any) {
-
-    $conversationId =
-      conv.id;
-
-
-    if (conv.last_result) {
-
-      $currentResult =
-        conv.last_result;
+  function restoreFromSummary(c: any) {
+    if (c.last_result) {
+      $currentResult = c.last_result;
     }
-
-
-    // Restore existing messages
-
-    if (
-      conv.messages &&
-      conv.messages.length
-    ) {
-
-      $messages =
-        conv.messages;
-
+    if (c.messages && c.messages.length) {
+      $messages = c.messages;
     } else {
-
-      // Reconstruct clean message thread
-
       $messages = [
         {
-          id:
-            `msg_${conv.id}_u`,
-
-          role:
-            'user',
-
-          content:
-            conv.query ||
-            conv.title,
-
-          timestamp:
-            conv.last_active ||
-            new Date().toISOString(),
+          id: `msg_${c.id}_u`,
+          role: 'user',
+          content: c.query || c.title,
+          timestamp: c.last_active || new Date().toISOString(),
         },
-
         {
-          id:
-            `msg_${conv.id}_a`,
-
-          role:
-            'assistant',
-
-          content:
-            conv.last_result?.key_finding ||
-            `${conv.title} analysis loaded.`,
-
-          result:
-            conv.last_result,
-
-          timestamp:
-            conv.last_active ||
-            new Date().toISOString(),
+          id: `msg_${c.id}_a`,
+          role: 'assistant',
+          content: c.last_result?.key_finding || `${c.title} analysis loaded.`,
+          result: c.last_result,
+          timestamp: c.last_active || new Date().toISOString(),
         }
       ];
     }
+  }
 
+  async function handleDelete(convId: string, event: MouseEvent) {
+    event.stopPropagation();
+    try {
+      await deleteConversation(convId);
+      conversations = conversations.filter((c) => c.id !== convId);
+      if ($conversationId === convId) {
+        $conversationId = '';
+        $messages = [];
+        $currentResult = null;
+      }
+    } catch (err) {
+      console.error('Failed to delete conversation:', err);
+    }
+  }
 
-    // =====================================================
-    // RESTORE GLOBE CAMERA
-    // =====================================================
+  async function handleSelect(conv: any) {
+    $conversationId = conv.id;
+    localStorage.setItem('sq_conv_id', conv.id);
+
+    try {
+      const fullConv = await fetchConversation(conv.id);
+      if (fullConv && fullConv.messages && fullConv.messages.length) {
+        $messages = fullConv.messages;
+        if (fullConv.last_result) {
+          $currentResult = fullConv.last_result;
+        }
+        if (fullConv.layers && fullConv.layers.length) {
+          $activeDataLayers = fullConv.layers;
+        } else if (fullConv.last_result?.layers && fullConv.last_result.layers.length) {
+          $activeDataLayers = fullConv.last_result.layers;
+        }
+      } else {
+        restoreFromSummary(conv);
+      }
+    } catch (e) {
+      console.warn('Using local summary fallback:', e);
+      restoreFromSummary(conv);
+    }
 
     const lat =
       conv.last_result?.aoi?.center?.latitude ??
@@ -251,47 +247,20 @@
       conv.last_result?.aoi?.polygon ??
       [];
 
-
     globeLocation.update((g) => ({
-
       ...g,
-
-      latitude:
-        lat,
-
-      longitude:
-        lon,
-
-      name:
-        name,
-
-      area_km2:
-        area,
-
-      polygon:
-        polygon,
-
-      flyTrigger:
-        g.flyTrigger + 1,
-
+      latitude: lat,
+      longitude: lon,
+      name: name,
+      area_km2: area,
+      polygon: polygon,
+      flyTrigger: g.flyTrigger + 1,
     }));
 
+    $appViewState = 'analysis';
+    $activeSidebarTab = 'chat';
 
-    // =====================================================
-    // SWITCH BACK TO ANALYSIS
-    // =====================================================
-
-    $appViewState =
-      'analysis';
-
-    $activeSidebarTab =
-      'chat';
-
-
-    dispatch(
-      'selectConversation',
-      conv
-    );
+    dispatch('selectConversation', conv);
   }
 
 
@@ -486,9 +455,12 @@
                  CONVERSATION CARD
                  ================================================= -->
 
-            <button
+            <div
               class="conv-card"
+              role="button"
+              tabindex="0"
               on:click={() => handleSelect(conv)}
+              on:keydown={(e) => e.key === 'Enter' && handleSelect(conv)}
               aria-label={`Open ${conv.title}`}
             >
 
@@ -501,12 +473,23 @@
                   {conv.title}
                 </span>
 
-                <span class="conv-time">
-                  {formatDate(
-                    conv.last_active ||
-                    conv.created_at
-                  )}
-                </span>
+                <div class="card-top-right">
+                  <span class="conv-time">
+                    {formatDate(
+                      conv.last_active ||
+                      conv.created_at
+                    )}
+                  </span>
+
+                  <button
+                    class="conv-delete-btn"
+                    on:click={(e) => handleDelete(conv.id, e)}
+                    title="Delete conversation"
+                    aria-label="Delete conversation"
+                  >
+                    <Trash2 size={12} />
+                  </button>
+                </div>
 
               </div>
 
@@ -613,7 +596,7 @@
 
               {/if}
 
-            </button>
+            </div>
 
           {/each}
 
@@ -1158,23 +1141,38 @@
 
 
   .conv-time {
-
-    flex-shrink:
-      0;
-
-    font-family:
-      var(--font-mono, "SF Mono", monospace);
-
-    font-size:
-      8.5px;
-
-    color:
-      rgba(255,255,255,0.27);
-
-    white-space:
-      nowrap;
+    flex-shrink: 0;
+    font-family: var(--font-mono, "SF Mono", monospace);
+    font-size: 8.5px;
+    color: rgba(255, 255, 255, 0.27);
+    white-space: nowrap;
   }
 
+  .card-top-right {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-shrink: 0;
+  }
+
+  .conv-delete-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 22px;
+    height: 22px;
+    background: transparent;
+    border: none;
+    border-radius: 4px;
+    color: rgba(255, 255, 255, 0.3);
+    cursor: pointer;
+    transition: all 0.15s ease;
+  }
+
+  .conv-delete-btn:hover {
+    color: #ef4444;
+    background: rgba(239, 68, 68, 0.15);
+  }
 
   /* =========================================================
      QUERY

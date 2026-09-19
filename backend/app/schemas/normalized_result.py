@@ -72,7 +72,7 @@ class AuditTraceStage(BaseModel):
 
 
 class Provenance(BaseModel):
-    source: str = "mock"  # "mock" | "worker"
+    source: str = "mock"  # "mock" | "worker" | "live" | "user_data"
     worker_url: Optional[str] = None
     fallback: bool = False
     model_id: str
@@ -80,6 +80,79 @@ class Provenance(BaseModel):
     dataset_ids: List[str]
     acquisition_dates: Optional[str] = None
     pipeline: str = "ATS / LangGraph"
+
+
+# ==============================================================================
+# CANONICAL GEOSPATIAL DATA-LAYER CONTRACT
+# ==============================================================================
+
+class LayerSpatial(BaseModel):
+    bounds: List[float] = Field(default_factory=list)  # [west, south, east, north] in WGS84
+    center: Optional[Coordinates] = None
+    polygon: Optional[List[List[float]]] = None  # [[lon, lat], ...]
+
+
+class LayerSource(BaseModel):
+    type: str  # "geojson" | "image" | "tile" | "user_asset" | "entity_collection"
+    url: Optional[str] = None  # Relative URL or endpoint
+    format: Optional[str] = None  # "geojson" | "png" | "cog" | "vector"
+    data: Optional[Dict[str, Any]] = None  # Inline GeoJSON Feature or FeatureCollection
+
+
+class LayerStyle(BaseModel):
+    opacity: float = 0.85
+    color: Optional[str] = None  # CSS fill color (e.g. "rgba(239, 68, 68, 0.35)")
+    outline_color: Optional[str] = None  # CSS stroke color (e.g. "#ef4444")
+    outline_width: float = 2.0
+    color_scale: Optional[str] = None  # "viridis" | "ndvi" | "thermal" | "red" | "amber" | "emerald" | "blue"
+
+
+class LayerLegendItem(BaseModel):
+    label: str
+    color: str
+    value: Optional[str] = None
+
+
+class LayerLegend(BaseModel):
+    type: str = "continuous"  # "continuous" | "categorical" | "metric_summary"
+    title: str
+    unit: Optional[str] = ""
+    min: Optional[float] = None
+    max: Optional[float] = None
+    color_scale: Optional[str] = None
+    items: Optional[List[LayerLegendItem]] = None
+
+
+class LayerTemporal(BaseModel):
+    start: Optional[str] = None
+    end: Optional[str] = None
+    acquisition_date: Optional[str] = None
+
+
+class LayerProvenance(BaseModel):
+    dataset_id: Optional[str] = None  # e.g., "sentinel-2", "sentinel-1", "user-upload"
+    model_id: Optional[str] = None  # e.g., "prithvi-eo-2.0", "terrafm", "deterministic"
+    source: str = "mock"  # "mock" | "live" | "user_data"
+
+
+class LayerAccess(BaseModel):
+    is_private: bool = False
+    user_id: Optional[str] = None
+    asset_id: Optional[str] = None
+
+
+class DataLayerSpec(BaseModel):
+    layer_id: str
+    type: str  # "aoi" | "imagery" | "raster" | "polygon" | "change_detection" | "flood_extent" | "heatmap" | "user_asset"
+    title: str
+    description: str
+    source: LayerSource
+    spatial: LayerSpatial
+    style: LayerStyle = Field(default_factory=LayerStyle)
+    legend: Optional[LayerLegend] = None
+    temporal: Optional[LayerTemporal] = None
+    provenance: LayerProvenance
+    access: LayerAccess = Field(default_factory=LayerAccess)
 
 
 class NormalizedResult(BaseModel):
@@ -95,6 +168,7 @@ class NormalizedResult(BaseModel):
     image_comparison: Optional[SatelliteImagePair] = None
     visualization: Optional[VisualizationSpec] = None
     visualizations: List[Dict[str, Any]] = Field(default_factory=list)
+    layers: List[DataLayerSpec] = Field(default_factory=list)
     time_series: List[TimeSeriesPoint] = Field(default_factory=list)
     before_image_url: Optional[str] = None
     after_image_url: Optional[str] = None

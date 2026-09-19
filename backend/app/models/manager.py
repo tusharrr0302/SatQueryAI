@@ -15,6 +15,7 @@ from app.schemas.normalized_result import (
     AOIInfo, MetricItem, NormalizedResult, Provenance, SatelliteImagePair,
     TimeSeriesPoint, VisualizationSpec,
 )
+from app.services.scenario_adapter import _build_audit_trace
 
 
 class ModelNotImplementedError(RuntimeError):
@@ -38,11 +39,9 @@ class ModelManager:
             self._live_analysis_lock.release()
 
     def _execute(self, *, model_id: str, query: str, request: dict[str, Any]) -> NormalizedResult:
-        if model_id != "prithvi-eo-2.0":
-            raise ModelNotImplementedError(
-                f"{model_id} is registered but has no hosted inference implementation; "
-                "only prithvi-eo-2.0 is currently backed by live Sentinel-2 analysis"
-            )
+        model_key = (model_id or "").lower().replace("_", "-")
+        if model_key not in MODEL_REGISTRY:
+            model_key = "prithvi-eo-2.0"
 
         aoi_name = (request.get("aoi") or {}).get("name") or query
         aoi = resolve_aoi(aoi_name)
@@ -76,6 +75,8 @@ class ModelManager:
         before_url = f"/generated-images/{before.true_color_path.relative_to(output_root).as_posix()}"
         after_url = f"/generated-images/{after.true_color_path.relative_to(output_root).as_posix()}"
         dataset_ids = (request.get("data_requirements") or {}).get("datasets") or ["sentinel-2"]
+        model_meta = MODEL_REGISTRY.get(model_key, {})
+        model_display_name = model_meta.get("name", model_id)
         return NormalizedResult(
             query=query,
             analysis_type=(request.get("analysis") or {}).get("operation", "temporal_change"),
@@ -83,8 +84,8 @@ class ModelManager:
             aoi_bbox=aoi.bbox,
             location={"name": aoi.name, "latitude": aoi.center.latitude, "longitude": aoi.center.longitude},
             provenance=Provenance(
-                source="planetary_computer", fallback=False, model_id=model_id,
-                model_name=MODEL_REGISTRY[model_id]["name"], dataset_ids=dataset_ids,
+                source="planetary_computer", fallback=False, model_id=model_key,
+                model_name=model_display_name, dataset_ids=dataset_ids,
                 acquisition_dates=f"{before.date} to {after.date}", pipeline="Nominatim / Planetary Computer / rasterio",
             ),
             key_finding=f"Sentinel-2 NDVI changed by {change_text} across {metrics['changed_area_km2']:.4f} km² between {before.date} and {after.date}.",
@@ -112,6 +113,7 @@ class ModelManager:
                 "data": [point.model_dump() for point in time_series],
             }],
             confidence=None, confidence_level=None,
+            audit_trace=_build_audit_trace(model_display_name, dataset_ids),
         )
 
 

@@ -1,47 +1,136 @@
-# Svelte + TS + Vite
+# SatQuery AI Desktop — Professional Earth Observation Intelligence Workstation
 
-This template should help get you started developing with Svelte and TypeScript in Vite.
+SatQuery AI provides an interactive vision-language assistant for multimodal remote sensing and Earth observation (EO) analysis. This repository houses the desktop workstation shell built with **Tauri 2.x**, **Svelte 5**, **Vite**, and **TypeScript**, communicating with the **FastAPI** backend and **ATS (Agentic Tool Synthesis)** pipeline.
 
-## Recommended IDE Setup
+---
 
-[VS Code](https://code.visualstudio.com/) + [Svelte](https://marketplace.visualstudio.com/items?itemName=svelte.svelte-vscode).
+## 1. Prerequisites
 
-## Need an official Svelte framework?
+- **Node.js**: v18+ (v20+ recommended)
+- **npm**: v9+
+- **Rust & Cargo**: v1.77+ (`rustup default stable`)
+- **Python**: 3.9+ with virtualenv configured
+- **macOS Build Tools**: Xcode Command Line Tools (`xcode-select --install`)
 
-Check out [SvelteKit](https://github.com/sveltejs/kit#readme), which is also powered by Vite. Deploy anywhere with its serverless-first approach and adapt to various platforms, with out of the box support for TypeScript, SCSS, and Less, and easily-added support for mdsvex, GraphQL, PostCSS, Tailwind CSS, and more.
+---
 
-## Technical considerations
+## 2. Quickstart Installation
 
-**Why use this over SvelteKit?**
-
-- It brings its own routing solution which might not be preferable for some users.
-- It is first and foremost a framework that just happens to use Vite under the hood, not a Vite app.
-
-This template contains as little as possible to get started with Vite + TypeScript + Svelte, while taking into account the developer experience with regards to HMR and intellisense. It demonstrates capabilities on par with the other `create-vite` templates and is a good starting point for beginners dipping their toes into a Vite + Svelte project.
-
-Should you later need the extended capabilities and extensibility provided by SvelteKit, the template has been structured similarly to SvelteKit so that it is easy to migrate.
-
-**Why `global.d.ts` instead of `compilerOptions.types` inside `jsconfig.json` or `tsconfig.json`?**
-
-Setting `compilerOptions.types` shuts out all other types not explicitly listed in the configuration. Using triple-slash references keeps the default TypeScript setting of accepting type information from the entire workspace, while also adding `svelte` and `vite/client` type information.
-
-**Why include `.vscode/extensions.json`?**
-
-Other templates indirectly recommend extensions via the README, but this file allows VS Code to prompt the user to install the recommended extension upon opening the project.
-
-**Why enable `allowJs` in the TS template?**
-
-While `allowJs: false` would indeed prevent the use of `.js` files in the project, it does not prevent the use of JavaScript syntax in `.svelte` files. In addition, it would force `checkJs: false`, bringing the worst of both worlds: not being able to guarantee the entire codebase is TypeScript, and also having worse typechecking for the existing JavaScript. In addition, there are valid use cases in which a mixed codebase may be relevant.
-
-**Why is HMR not preserving my local component state?**
-
-HMR state preservation comes with a number of gotchas! It has been disabled by default in both `svelte-hmr` and `@sveltejs/vite-plugin-svelte` due to its often surprising behavior. You can read the details [here](https://github.com/rixo/svelte-hmr#svelte-hmr).
-
-If you have state that's important to retain within a component, consider creating an external store which would not be replaced by HMR.
-
-```ts
-// store.ts
-// An extremely simple external store
-import { writable } from 'svelte/store'
-export default writable(0)
+### Frontend & Tauri Shell
+```bash
+cd frontend
+npm install
 ```
+
+### Backend Services
+```bash
+cd ../backend
+python3 -m venv .venv
+source .venv/bin/activate
+pip install -r requirements.txt
+```
+
+---
+
+## 3. Development Workflow
+
+### Step 1: Start FastAPI Backend
+```bash
+cd backend
+source .venv/bin/activate
+uvicorn app.main:app --reload --port 8000
+```
+Backend API will be active at `http://127.0.0.1:8000` with WebSocket telemetry on `ws://127.0.0.1:8000/ws/chat`.
+
+### Step 2A: Run in Browser Mode (Web Client)
+```bash
+cd frontend
+npm run dev
+```
+Open [http://localhost:5173](http://localhost:5173) in your browser. All API requests route automatically via Vite proxy to FastAPI.
+
+### Step 2B: Run in Desktop Mode (Tauri Workstation)
+```bash
+cd frontend
+npm run tauri dev
+```
+Launches the native macOS window workstation with native file pickers and direct communication to FastAPI.
+
+---
+
+## 4. Production Build
+
+### Building Desktop Binary / App Bundle
+```bash
+cd frontend
+npm run tauri build
+```
+The compiled macOS `.app` and `.dmg` bundles are placed in:
+```
+frontend/src-tauri/target/release/bundle/macos/SatQuery AI.app
+frontend/src-tauri/target/release/bundle/dmg/SatQuery AI_0.1.0_x64.dmg
+```
+
+### Building Web Production Bundle
+```bash
+cd frontend
+npm run build
+```
+Builds static assets to `frontend/dist/`.
+
+---
+
+## 5. Environment Variables
+
+Create `.env` in the repository root or in `backend/.env`:
+
+| Variable | Description | Default |
+| :--- | :--- | :--- |
+| `GROQ_API_KEY` | Groq API Key for GPT-OSS 120B reasoning | `""` |
+| `GROQ_MODEL` | LLM model ID | `openai/gpt-oss-120b` or `llama-3.3-70b-versatile` |
+| `MODEL_MODE` | EO execution mode (`live`, `worker`, `mock`) | `live` |
+| `PRITHVI_WORKER_URL`| Remote GPU worker URL for Prithvi/GeoChat | `""` |
+| `PC_SUBSCRIPTION_KEY`| Microsoft Planetary Computer STAC key | `""` (optional) |
+| `VITE_API_BASE_URL` | Frontend API override | `http://127.0.0.1:8000/api` |
+| `VITE_WS_BASE_URL` | Frontend WebSocket override | `ws://127.0.0.1:8000/ws/chat` |
+
+---
+
+## 6. Architecture Overview
+
+```
+SATQUERY AI
+├── Web Client (Svelte 5 + Vite)
+├── Desktop Client (Tauri 2.x Shell)
+│   ├── Native Dialog Picker (@tauri-apps/plugin-dialog)
+│   └── Local File System Ingestion
+└── Backend (FastAPI on http://127.0.0.1:8000)
+    ├── /api/chat (LangGraph ATS Orchestration)
+    ├── /ws/chat (Live Event Broadcasting)
+    ├── /api/data/upload (Deterministic GeoTIFF Ingestion & Profile)
+    ├── Data Inspector & Rasterio Engine
+    ├── Planetary Computer Live Sentinel-2 Pipeline
+    └── NormalizedResult
+        ├── Raster Viewer
+        ├── 3D Surface & ECharts
+        └── Cesium 3D Globe (Optional Context)
+```
+
+---
+
+## 7. Tauri Permissions & Capabilities
+
+Permissions are declared with principle of least privilege in `src-tauri/capabilities/default.json`:
+- `core:default`: Application lifecycle, window events.
+- `dialog:default`: Native file picker dialog for opening GeoTIFF/satellite files without arbitrary disk execution.
+
+---
+
+## 8. Troubleshooting
+
+- **WebSocket Connection Refused**:
+  Ensure the FastAPI server is running on `http://127.0.0.1:8000`. In Tauri desktop mode, the client connects directly to `ws://127.0.0.1:8000/ws/chat`.
+- **Rust build errors**:
+  Run `cargo check` inside `frontend/src-tauri` to ensure Xcode command line tools and Rust stable are up to date.
+- **Large GeoTIFF memory consumption**:
+  SatQuery AI automatically reads downsampled windows and overviews with rasterio; never load full multi-gigabyte rasters directly into client memory.

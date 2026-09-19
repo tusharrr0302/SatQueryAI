@@ -116,6 +116,76 @@ export interface BackendVisualization {
   };
 }
 
+export interface LayerSpatial {
+  bounds: number[];
+  center?: Coordinates;
+  polygon?: number[][];
+}
+
+export interface LayerSource {
+  type: string;
+  url?: string;
+  format?: string;
+  data?: any;
+}
+
+export interface LayerStyle {
+  opacity: number;
+  color?: string;
+  outline_color?: string;
+  outline_width?: number;
+  color_scale?: string;
+}
+
+export interface LayerLegendItem {
+  label: string;
+  color: string;
+  value?: string;
+}
+
+export interface LayerLegend {
+  type: string;
+  title: string;
+  unit?: string;
+  min?: number;
+  max?: number;
+  color_scale?: string;
+  items?: LayerLegendItem[];
+}
+
+export interface LayerTemporal {
+  start?: string;
+  end?: string;
+  acquisition_date?: string;
+}
+
+export interface LayerProvenance {
+  dataset_id?: string;
+  model_id?: string;
+  source: string;
+}
+
+export interface LayerAccess {
+  is_private: boolean;
+  user_id?: string;
+  asset_id?: string;
+}
+
+export interface DataLayerSpec {
+  layer_id: string;
+  type: string;
+  title: string;
+  description: string;
+  source: LayerSource;
+  spatial: LayerSpatial;
+  style: LayerStyle;
+  legend?: LayerLegend;
+  temporal?: LayerTemporal;
+  provenance: LayerProvenance;
+  access: LayerAccess;
+  visible?: boolean;
+}
+
 export interface NormalizedResult {
   result_id: string;
   query: string;
@@ -133,6 +203,7 @@ export interface NormalizedResult {
   image_comparison?: SatelliteImagePair;
   visualization?: VisualizationSpec;
   visualizations?: BackendVisualization[];
+  layers?: DataLayerSpec[];
   time_series: TimeSeriesPoint[];
   before_image_url?: string;
   after_image_url?: string;
@@ -160,14 +231,18 @@ export const activeNav = writable<"home" | "datasets" | "use-cases" | "docs">(
 );
 export const activeSidebarTab = writable<
   | "chat"
-  | "map"
+  | "data"
   | "layers"
-  | "analysis"
   | "investigations"
   | "history"
   | "settings"
 >("chat");
 export const isLandingPage = writable<boolean>(true);
+
+// User Uploaded Data Assets
+export const activeAsset = writable<any | null>(null);
+export const userAssets = writable<any[]>([]);
+export const activeVisualizationTab = writable<"raster" | "surface" | "globe">("raster");
 
 // Chat & Results
 export const conversationId = writable<string>(
@@ -175,10 +250,33 @@ export const conversationId = writable<string>(
 );
 export const messages = writable<ChatMessage[]>([]);
 export const currentResult = writable<NormalizedResult | null>(null);
+export const activeDataLayers = writable<DataLayerSpec[]>([]);
+export const currentGlobeSkin = writable<string>(
+  typeof window !== 'undefined' ? (localStorage.getItem('sq_globe_skin') || 'dark') : 'dark'
+);
+export const flyToLayerTrigger = writable<{ layerId: string; timestamp: number } | null>(null);
 export const isAnalyzing = writable<boolean>(false);
+export interface AnalysisStepInfo {
+  step: string;
+  label: string;
+  status: 'pending' | 'running' | 'completed';
+}
+
+export const liveAnalysisSteps = writable<AnalysisStepInfo[]>([
+  { step: 'understanding', label: 'Understanding query with GPT-OSS', status: 'pending' },
+  { step: 'aoi', label: 'Resolving AOI & geospatial bounds', status: 'pending' },
+  { step: 'imagery', label: 'Selecting Earth Observation imagery', status: 'pending' },
+  { step: 'analysis', label: 'Executing geospatial analysis model', status: 'pending' },
+  { step: 'visualization', label: 'Preparing map layers & visualizations', status: 'pending' },
+]);
+export const liveAnalysisStatus = writable<string>('Analyzing Earth...');
+
 export const showAuditTraceModal = writable<boolean>(false);
 export const showSettingsModal = writable<boolean>(false);
 export const showSaveInvestigationModal = writable<boolean>(false);
+export type AuthModalMode = 'sign-in' | 'sign-up' | 'user-profile';
+export const showAuthModal = writable<boolean>(false);
+export const authModalMode = writable<AuthModalMode>('sign-in');
 
 // Globe & AOI state
 export const globeLocation = writable<{

@@ -1,14 +1,18 @@
 <script lang="ts">
   import { onMount, onDestroy } from 'svelte';
-  import { globeLocation, layersState, currentResult } from '../stores';
+  import { globeLocation, layersState, currentResult, activeDataLayers, currentGlobeSkin, flyToLayerTrigger } from '../stores';
   import { Plus, Minus, Crosshair, Edit3 } from 'lucide-svelte';
   import * as Cesium from 'cesium';
   import 'cesium/Build/Cesium/Widgets/widgets.css';
+  import { CesiumLayerManager } from '../services/CesiumLayerManager';
+  import { GlobeSkinManager } from '../services/globeSkinManager';
 
   export let viewState: 'landing' | 'processing' | 'analysis' = 'landing';
 
   let container: HTMLDivElement;
   let viewer: Cesium.Viewer | null = null;
+  let layerManager: CesiumLayerManager | null = null;
+  let skinManager: GlobeSkinManager | null = null;
 
   let markerEntity: Cesium.Entity | null = null;
   let polygonEntity: Cesium.Entity | null = null;
@@ -94,33 +98,13 @@
 
 
       /* =====================================================
-         ESRI WORLD IMAGERY
+         GLOBE SKIN / BASEMAP SYSTEM (PHASE 8)
          ===================================================== */
-
       try {
-        const esriProvider =
-          new Cesium.UrlTemplateImageryProvider({
-            url:
-              'https://services.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
-
-            tilingScheme:
-              new Cesium.WebMercatorTilingScheme(),
-
-            maximumLevel: 19,
-
-            credit: 'Esri World Imagery'
-          });
-
-        satelliteLayer =
-          viewer.imageryLayers.addImageryProvider(
-            esriProvider
-          );
-
-      } catch (imageryErr) {
-        console.warn(
-          'Esri World Imagery setup failed:',
-          imageryErr
-        );
+        skinManager = new GlobeSkinManager(viewer);
+        skinManager.setSkin($currentGlobeSkin || 'dark');
+      } catch (skinErr) {
+        console.warn('GlobeSkinManager setup failed:', skinErr);
       }
 
 
@@ -239,6 +223,8 @@
          INITIAL VIEW
          ===================================================== */
 
+      layerManager = new CesiumLayerManager(viewer);
+
       if (viewState === 'landing') {
         setLandingView();
       } else {
@@ -269,6 +255,16 @@
      ========================================================= */
 
   onDestroy(() => {
+    if (skinManager) {
+      skinManager.destroy();
+      skinManager = null;
+    }
+
+    if (layerManager) {
+      layerManager.destroy();
+      layerManager = null;
+    }
+
     if (resizeObserver) {
       resizeObserver.disconnect();
       resizeObserver = null;
@@ -1358,13 +1354,98 @@
       cat === 'wildfire'
     ) {
 
-      addChangeLayer(
+        addChangeLayer(
         'Vegetation Disturbance',
         $globeLocation.polygon,
         null,
         'red'
       );
     }
+  }
+
+
+  /* =========================================================
+     CESIUM DATA LAYER MANAGER SYNCHRONIZATION (PHASE 4)
+     ========================================================= */
+
+  let renderedLayerIds = new Set<string>();
+
+  $: if (layerManager && viewer && !viewer.isDestroyed() && viewState !== 'landing') {
+    const currentSpecs = $activeDataLayers || [];
+    const newIds = new Set(currentSpecs.map((s) => s.layer_id));
+
+    // Remove any layers no longer present in store
+    for (const id of Array.from(renderedLayerIds)) {
+      if (!newIds.has(id)) {
+        layerManager.removeLayer(id);
+      }
+    }
+
+    // Add or update layers
+    for (const spec of currentSpecs) {
+      if (!renderedLayerIds.has(spec.layer_id)) {
+        layerManager.addLayer(spec, false);
+      } else {
+        layerManager.updateLayer(spec);
+      }
+    }
+
+    renderedLayerIds = newIds;
+  }
+
+  // When currentResult emits layers, merge into activeDataLayers store
+  $: if ($currentResult && $currentResult.layers && $currentResult.layers.length > 0) {
+    const incoming = $currentResult.layers;
+    activeDataLayers.update((existing) => {
+      const map = new Map<string, DataLayerSpec>();
+      for (const l of existing || []) {
+        map.set(l.layer_id, l);
+      }
+      for (const l of incoming) {
+        map.set(l.layer_id, l);
+      }
+      return Array.from(map.values());
+    });
+  }
+
+  // Reactive Globe Skin switching (Phase 8)
+  $: if (skinManager && $currentGlobeSkin) {
+    skinManager.setSkin($currentGlobeSkin);
+  }
+
+  // Camera flight trigger from external components (Phase 6 / 7)
+  let lastHandledFlyTimestamp = 0;
+  $: if (layerManager && $flyToLayerTrigger && $flyToLayerTrigger.timestamp > lastHandledFlyTimestamp) {
+    lastHandledFlyTimestamp = $flyToLayerTrigger.timestamp;
+    layerManager.flyToLayer($flyToLayerTrigger.layerId);
+  }
+
+  export function getLayerManager(): CesiumLayerManager | null {
+    return layerManager;
+  }
+
+  export function setLayerVisibility(layerId: string, visible: boolean) {
+    layerManager?.setLayerVisibility(layerId, visible);
+    activeDataLayers.update((layers) =>
+      layers.map((l) => (l.layer_id === layerId ? { ...l, visible } : l))
+    );
+  }
+
+  export function setLayerOpacity(layerId: string, opacity: number) {
+    layerManager?.setLayerOpacity(layerId, opacity);
+    activeDataLayers.update((layers) =>
+      layers.map((l) => (l.layer_id === layerId ? { ...l, style: { ...l.style, opacity } } : l))
+    );
+  }
+
+  export function flyToDataLayer(layerId: string, duration = 2.0) {
+    layerManager?.flyToLayer(layerId, duration);
+  }
+
+  export function clearDataLayers() {
+    layerManager?.clearLayers();
+    renderedLayerIds.clear();
+    activeDataLayers.set([]);
   }
 </script>
 

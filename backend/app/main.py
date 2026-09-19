@@ -7,6 +7,12 @@ from app.config import settings
 from app.graph.workflow import build_graph
 from app.api.routes import api_router
 from app.api.websocket import ws_router
+from app.api.data_routes import data_router
+from app.db.session import engine, Base
+from app.db import models
+
+# Ensure all database tables exist
+Base.metadata.create_all(bind=engine)
 
 app = FastAPI(title="SatQuery AI", description="Interactive Earth-Observation Intelligence Workstation")
 
@@ -30,6 +36,7 @@ app.mount("/generated-images", StaticFiles(directory=image_output_dir), name="ge
 # Include routers
 app.include_router(api_router)
 app.include_router(ws_router)
+app.include_router(data_router)
 
 
 @app.get("/health")
@@ -46,3 +53,9 @@ def test_graph():
         "user_query": "Show me how Delhi changed over the last 10 years"
     })
     return result
+
+
+# Serve built frontend web application if dist directory exists
+frontend_dist = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "frontend", "dist"))
+if os.path.isdir(frontend_dist):
+    app.mount("/", StaticFiles(directory=frontend_dist, html=True), name="frontend")

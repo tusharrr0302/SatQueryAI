@@ -29,3 +29,12 @@ backend/app/static/generated/*
 .DS_Store
 *.DS_Store
 .vscode/
+
+# App data & Tauri build artifacts
+backend/app_data/
+frontend/src-tauri/target/
+frontend/src-tauri/gen/
+*.db
+*.sqlite
+backend/satquery.db
+full_prompt_*.txt

@@ -138,7 +138,11 @@ def _extract_query_location(norm_query: str) -> Optional[str]:
     return None
 
 
-def find_matching_scenario(query: str, threshold: float = 0.55) -> Optional[Dict[str, Any]]:
+def find_matching_scenario(
+    query: str,
+    threshold: float = 0.48,
+    location_hint: Optional[str] = None,
+) -> Optional[Dict[str, Any]]:
     """
     Deterministically match a user query against the mock scenarios.
     Returns the scenario dict if matched with high confidence, otherwise None.
@@ -149,6 +153,9 @@ def find_matching_scenario(query: str, threshold: float = 0.55) -> Optional[Dict
     norm_query = normalize_text(query)
     q_tokens = extract_tokens(norm_query)
     query_location = _extract_query_location(norm_query)
+    if not query_location and location_hint:
+        hint_norm = normalize_text(location_hint)
+        query_location = _extract_query_location(hint_norm) or (hint_norm if len(hint_norm) > 2 else None)
 
     scenarios = load_scenarios()
     scored_matches: List[Tuple[float, Dict[str, Any]]] = []
@@ -210,6 +217,11 @@ def find_matching_scenario(query: str, threshold: float = 0.55) -> Optional[Dict
             scored_matches.append((total_score, s))
 
     if not scored_matches:
+        # If the query specifies an unknown location (e.g. Kathmandu, Paris, etc.), do not force a fallback
+        loc_candidates = re.findall(r"\b(?:in|around|near|across|over|at|for)\s+([a-z]+)\b", norm_query)
+        if any(c not in STOP_WORDS and c not in LOCATION_ALIASES and len(c) > 3 for c in loc_candidates):
+            return None
+
         # Deterministic concept mapping to existing flagship scenarios for location-agnostic queries
         scenario_map = {s.get("id"): s for s in scenarios}
         if any(k in norm_query for k in ["land cover", "lulc", "class distribution", "classes", "water and built", "built and water", "vegetation and built"]):
@@ -235,3 +247,7 @@ def find_matching_scenario(query: str, threshold: float = 0.55) -> Optional[Dict
     best_score, best_scenario = scored_matches[0]
 
     return best_scenario
+
+
+# Alias for backward compatibility
+match_scenario = find_matching_scenario

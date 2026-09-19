@@ -1,11 +1,14 @@
 <script lang="ts">
   import { createEventDispatcher } from 'svelte';
-  import { activeNav, showSettingsModal } from '../stores';
-  import { Search, ChevronDown } from 'lucide-svelte';
+  import { activeNav, showSettingsModal, showAuthModal, authModalMode, activeSidebarTab, activeDataLayers } from '../stores';
+  import { isSignedIn, currentUser, signOutUser } from '../services/authService';
+  import { Search, ChevronDown, User, Settings, LogOut, LogIn, Layers } from 'lucide-svelte';
 
   const dispatch = createEventDispatcher<{
     navHome: void;
   }>();
+
+  let isUserMenuOpen = false;
 
   function handleNav(item: 'home' | 'datasets' | 'use-cases' | 'docs') {
     $activeNav = item;
@@ -19,6 +22,56 @@
     $activeNav = 'home';
     dispatch('navHome');
   }
+
+  function toggleUserMenu() {
+    isUserMenuOpen = !isUserMenuOpen;
+  }
+
+  function closeUserMenu() {
+    isUserMenuOpen = false;
+  }
+
+  function openSignIn() {
+    $authModalMode = 'sign-in';
+    $showAuthModal = true;
+    closeUserMenu();
+  }
+
+  function openUserProfile() {
+    $authModalMode = 'user-profile';
+    $showAuthModal = true;
+    closeUserMenu();
+  }
+
+  function openSettings() {
+    $showSettingsModal = true;
+    closeUserMenu();
+  }
+
+  function toggleLayers() {
+    $activeSidebarTab = $activeSidebarTab === 'layers' ? 'chat' : 'layers';
+  }
+
+  async function handleSignOut() {
+    await signOutUser();
+    closeUserMenu();
+  }
+
+  function getInitials(user: any): string {
+    if (!user) return 'SQ';
+    if (user.firstName && user.lastName) {
+      return `${user.firstName[0]}${user.lastName[0]}`.toUpperCase();
+    }
+    if (user.fullName) {
+      const parts = user.fullName.trim().split(' ');
+      if (parts.length >= 2) return `${parts[0][0]}${parts[1][0]}`.toUpperCase();
+      return user.fullName.slice(0, 2).toUpperCase();
+    }
+    if (user.primaryEmailAddress) {
+      return user.primaryEmailAddress.slice(0, 2).toUpperCase();
+    }
+    return 'SQ';
+  }
 </script>
 
 <header class="navbar-wrapper">
@@ -31,7 +84,7 @@
       aria-label="Go to home"
     >
       <img
-        src="/satquery_logo.png"
+        src="/nav_logo.png"
         alt="SatQuery"
         class="brand-logo-img"
       />
@@ -102,23 +155,84 @@
         <Search size={16} strokeWidth={1.7} />
       </button>
 
-      <!-- User -->
+      <!-- Globe Skins & Layers Button -->
       <button
-        class="user-profile"
-        on:click={() => ($showSettingsModal = true)}
-        aria-label="Open profile"
+        class="icon-btn layers-nav-btn"
+        class:active={$activeSidebarTab === 'layers'}
+        on:click={toggleLayers}
+        aria-label="Globe Skins & Layers"
+        title="Globe Skins & Layers"
       >
-        <div class="avatar-badge">
-          TK
-        </div>
-
-        <ChevronDown
-          size={13}
-          strokeWidth={1.7}
-          class="chevron"
-        />
+        <Layers size={16} strokeWidth={1.7} />
+        {#if $activeDataLayers.length > 0}
+          <span class="nav-layer-dot"></span>
+        {/if}
       </button>
 
+      <!-- User Profile / Auth Button -->
+      {#if $isSignedIn && $currentUser}
+        <div class="user-menu-wrapper">
+          <button
+            class="user-profile"
+            on:click={toggleUserMenu}
+            aria-label="Open user menu"
+            aria-expanded={isUserMenuOpen}
+          >
+            {#if $currentUser.imageUrl}
+              <img src={$currentUser.imageUrl} alt={$currentUser.fullName || 'User'} class="avatar-img" />
+            {:else}
+              <div class="avatar-badge">
+                {getInitials($currentUser)}
+              </div>
+            {/if}
+
+            <ChevronDown
+              size={13}
+              strokeWidth={1.7}
+              class={`chevron ${isUserMenuOpen ? 'rotate' : ''}`}
+            />
+          </button>
+
+          {#if isUserMenuOpen}
+            <div class="user-dropdown-backdrop" on:click={closeUserMenu}></div>
+            <div class="user-dropdown-card">
+              <div class="dropdown-header">
+                <div class="user-name">{$currentUser.fullName || 'SatQuery Analyst'}</div>
+                <div class="user-email">{$currentUser.primaryEmailAddress || 'analyst@satquery.ai'}</div>
+              </div>
+
+              <div class="dropdown-divider"></div>
+
+              <button class="dropdown-item" on:click={openUserProfile}>
+                <User size={14} />
+                <span>Account Profile</span>
+              </button>
+
+              <button class="dropdown-item" on:click={openSettings}>
+                <Settings size={14} />
+                <span>Workstation Settings</span>
+              </button>
+
+              <div class="dropdown-divider"></div>
+
+              <button class="dropdown-item danger" on:click={handleSignOut}>
+                <LogOut size={14} />
+                <span>Sign Out</span>
+              </button>
+            </div>
+          {/if}
+        </div>
+      {:else}
+        <!-- Unauthenticated: Sign In CTA -->
+        <button
+          class="sign-in-btn"
+          on:click={openSignIn}
+          aria-label="Sign in"
+        >
+          <LogIn size={13} />
+          <span>Sign In</span>
+        </button>
+      {/if}
     </div>
 
   </div>
@@ -217,29 +331,25 @@
   }
 
   .brand-logo-img {
-    width: 31px;
-    height: 31px;
+    width: 32px;
+    height: 32px;
 
     object-fit: contain;
     display: block;
 
-    filter:
-      grayscale(1)
-      brightness(1.25);
-
     opacity: 0.95;
+    filter: drop-shadow(0 0 4px rgba(255, 255, 255, 0.2));
 
     transition:
       opacity 0.2s ease,
-      filter 0.2s ease;
+      filter 0.2s ease,
+      transform 0.2s ease;
   }
 
   .brand-container:hover .brand-logo-img {
     opacity: 1;
-
-    filter:
-      grayscale(1)
-      brightness(1.45);
+    filter: drop-shadow(0 0 10px rgba(255, 255, 255, 0.65));
+    transform: scale(1.06);
   }
 
 
@@ -383,6 +493,27 @@
     transform: scale(0.94);
   }
 
+  .layers-nav-btn {
+    position: relative;
+  }
+
+  .layers-nav-btn.active {
+    color: #38bdf8;
+    background: rgba(56, 189, 248, 0.12);
+    border-color: rgba(56, 189, 248, 0.35);
+  }
+
+  .nav-layer-dot {
+    position: absolute;
+    top: 6px;
+    right: 6px;
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: #38bdf8;
+    box-shadow: 0 0 6px #38bdf8;
+  }
+
 
   /* =========================================
      PROFILE
@@ -464,6 +595,136 @@
     color: rgba(255, 255, 255, 0.8);
   }
 
+  .chevron.rotate {
+    transform: rotate(180deg);
+  }
+
+  .avatar-img {
+    width: 30px;
+    height: 30px;
+    border-radius: 50%;
+    object-fit: cover;
+    border: 1px solid rgba(255, 255, 255, 0.17);
+  }
+
+  .user-menu-wrapper {
+    position: relative;
+  }
+
+  .user-dropdown-backdrop {
+    position: fixed;
+    inset: 0;
+    z-index: 1001;
+    background: transparent;
+  }
+
+  .user-dropdown-card {
+    position: absolute;
+    top: calc(100% + 12px);
+    right: 0;
+    width: 230px;
+    z-index: 1002;
+    background: rgba(12, 12, 12, 0.96);
+    border: 1px solid rgba(255, 255, 255, 0.14);
+    border-radius: 12px;
+    padding: 6px;
+    box-shadow: 0 16px 36px rgba(0, 0, 0, 0.65), inset 0 1px 0 rgba(255, 255, 255, 0.08);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    animation: dropdownIn 0.15s ease-out;
+  }
+
+  @keyframes dropdownIn {
+    from {
+      opacity: 0;
+      transform: translateY(-4px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  .dropdown-header {
+    padding: 8px 10px;
+  }
+
+  .user-name {
+    font-size: 13px;
+    font-weight: 500;
+    color: #ffffff;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .user-email {
+    font-size: 11px;
+    color: rgba(255, 255, 255, 0.45);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    margin-top: 2px;
+  }
+
+  .dropdown-divider {
+    height: 1px;
+    background: rgba(255, 255, 255, 0.08);
+    margin: 4px 0;
+  }
+
+  .dropdown-item {
+    width: 100%;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 10px;
+    background: transparent;
+    border: none;
+    border-radius: 6px;
+    color: rgba(255, 255, 255, 0.75);
+    font-size: 12px;
+    font-weight: 400;
+    cursor: pointer;
+    text-align: left;
+    transition: all 0.15s ease;
+  }
+
+  .dropdown-item:hover {
+    background: rgba(255, 255, 255, 0.08);
+    color: #ffffff;
+  }
+
+  .dropdown-item.danger {
+    color: rgba(239, 68, 68, 0.85);
+  }
+
+  .dropdown-item.danger:hover {
+    background: rgba(239, 68, 68, 0.12);
+    color: #ef4444;
+  }
+
+  .sign-in-btn {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    height: 36px;
+    padding: 0 14px;
+    background: rgba(255, 255, 255, 0.06);
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    border-radius: 999px;
+    color: #ffffff;
+    font-size: 12px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s ease;
+  }
+
+  .sign-in-btn:hover {
+    background: #ffffff;
+    color: #000000;
+    border-color: #ffffff;
+  }
 
   /* =========================================
      RESPONSIVE

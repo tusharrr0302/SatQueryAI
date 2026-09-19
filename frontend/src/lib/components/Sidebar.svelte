@@ -11,6 +11,7 @@
   import {
     Plus,
     MessageSquare,
+    Database,
     Layers,
     Shield,
     Clock,
@@ -26,6 +27,7 @@
   function selectTab(
     tab:
       | 'chat'
+      | 'data'
       | 'layers'
       | 'investigations'
       | 'history'
@@ -81,6 +83,22 @@
       />
 
       <span>Chat</span>
+    </button>
+
+
+    <!-- Data -->
+    <button
+      class="nav-item"
+      class:active={$activeSidebarTab === 'data' && !$isLandingPage}
+      on:click={() => selectTab('data')}
+      title="Your Data"
+    >
+      <Database
+        size={18}
+        strokeWidth={1.7}
+      />
+
+      <span>Data</span>
     </button>
 
 
