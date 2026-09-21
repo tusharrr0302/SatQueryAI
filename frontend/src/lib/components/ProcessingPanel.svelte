@@ -890,7 +890,7 @@
   }
 
 
-  .check-done {
+  :global(.check-done) {
 
     color:
       rgba(255,255,255,0.82);

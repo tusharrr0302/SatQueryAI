@@ -43,6 +43,17 @@
   function handleMouseUp() {
     isDragging = false;
   }
+
+  function handleKeyDown(e: KeyboardEvent) {
+    const step = 20;
+    if (e.key === 'ArrowUp') { panY += step; e.preventDefault(); }
+    else if (e.key === 'ArrowDown') { panY -= step; e.preventDefault(); }
+    else if (e.key === 'ArrowLeft') { panX += step; e.preventDefault(); }
+    else if (e.key === 'ArrowRight') { panX -= step; e.preventDefault(); }
+    else if (e.key === '+' || e.key === '=') { handleZoomIn(); e.preventDefault(); }
+    else if (e.key === '-') { handleZoomOut(); e.preventDefault(); }
+    else if (e.key === '0') { handleReset(); e.preventDefault(); }
+  }
 </script>
 
 <div class="raster-viewer-card">
@@ -65,8 +76,10 @@
     on:mousemove={handleMouseMove}
     on:mouseup={handleMouseUp}
     on:mouseleave={handleMouseUp}
-    role="region"
-    aria-label="Interactive Raster Viewport"
+    on:keydown={handleKeyDown}
+    role="button"
+    tabindex="0"
+    aria-label="Interactive Raster Viewport. Use arrow keys to pan, plus or minus to zoom."
   >
     {#if imageUrl}
       <div

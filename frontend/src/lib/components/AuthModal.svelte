@@ -496,51 +496,6 @@
     margin: 0 0 16px 0;
   }
 
-  .dev-code-snippet {
-    width: 100%;
-    background: #000000;
-    border: 1px solid rgba(255, 255, 255, 0.1);
-    border-radius: 8px;
-    padding: 10px 14px;
-    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
-    font-size: 12px;
-    color: #60a5fa;
-    margin-bottom: 18px;
-    text-align: left;
-    overflow-x: auto;
-  }
-
-  .dev-status-box {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    background: rgba(16, 185, 129, 0.08);
-    border: 1px solid rgba(16, 185, 129, 0.2);
-    border-radius: 6px;
-    padding: 8px 12px;
-    font-size: 11px;
-    color: rgba(255, 255, 255, 0.8);
-    margin-bottom: 20px;
-    text-align: left;
-  }
-
-  .dev-action-btn {
-    width: 100%;
-    background: #ffffff;
-    color: #000000;
-    border: none;
-    border-radius: 8px;
-    padding: 10px 16px;
-    font-size: 13px;
-    font-weight: 500;
-    cursor: pointer;
-    transition: opacity 0.15s ease;
-  }
-
-  .dev-action-btn:hover {
-    opacity: 0.9;
-  }
-
   .auth-card-footer {
     display: flex;
     align-items: center;

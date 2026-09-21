@@ -110,6 +110,14 @@ LOCATION_ALIASES: Dict[str, str] = {
     "khambhat": "gulf of khambhat",
     "derna": "derna, libya",
     "libya": "derna, libya",
+    "kashmir": "kashmir",
+    "kashmir valley": "kashmir valley",
+    "srinagar": "srinagar",
+    "jammu": "jammu & kashmir",
+    "jammu & kashmir": "jammu & kashmir",
+    "jammu and kashmir": "jammu & kashmir",
+    "himachal": "himachal pradesh",
+    "shimla": "shimla",
 }
 
 
@@ -147,13 +155,39 @@ def find_matching_scenario(
     Deterministically match a user query against the mock scenarios.
     Returns the scenario dict if matched with high confidence, otherwise None.
     """
-    if not query or not query.strip():
+    norm_query = normalize_text(query)
+    q_tokens = extract_tokens(query)
+
+    # Conversational, meta, and out-of-scope query guard
+    conversational_patterns = [
+        r"\b(?:what|which)\s+datasets?\b",
+        r"\bexplain\s+(?:that|this|the\s+result|like|simply|beginner)\b",
+        r"\bwho\s+are\s+you\b",
+        r"\bwhat\s+is\s+(?:the\s+)?population\b",
+        r"\bwhat\s+is\s+mars\b",
+        r"\bmars\b",
+        r"\bhow\s+does\s+(?:this|it)\s+work\b",
+        r"\bcan\s+you\s+explain\b",
+        r"\btell\s+me\s+more\s+about\s+(?:yourself|your\s+models)\b",
+    ]
+    if any(re.search(pat, norm_query) for pat in conversational_patterns):
         return None
 
-    norm_query = normalize_text(query)
-    q_tokens = extract_tokens(norm_query)
+    # Determine if query has an explicit remote-sensing analysis intent
+    has_analysis_intent = any(k in norm_query for k in [
+        "vegetation", "ndvi", "forest", "tree", "urban", "built-up", "built up",
+        "expansion", "sprawl", "growth", "flood", "inundat", "water", "crop",
+        "agriculture", "farm", "wildfire", "fire", "burn", "dnbr", "sar",
+        "radar", "satellite", "imagery", "land cover", "lulc", "coastal", "ocean",
+        "change detection", "surface", "southern", "northern", "eastern", "western",
+        "terrain", "elevation", "heatmap", "concentration", "point", "detected"
+    ])
+
+    # Extract location from query
     query_location = _extract_query_location(norm_query)
-    if not query_location and location_hint:
+
+    # Only use location_hint if query does NOT have its own location AND has analysis intent
+    if not query_location and location_hint and has_analysis_intent:
         hint_norm = normalize_text(location_hint)
         query_location = _extract_query_location(hint_norm) or (hint_norm if len(hint_norm) > 2 else None)
 
@@ -169,17 +203,17 @@ def find_matching_scenario(
         # 1. Location match score (0.0 to 1.0)
         loc_score = 0.0
         if query_location:
-            # Check if this scenario matches the query's location
             if query_location in s_loc or any(part in s_loc for part in query_location.split(",")):
                 loc_score = 1.0
             else:
-                # If query specified a different known location, this scenario does NOT match
                 continue
         else:
-            # If scenario location has words directly present in query
             s_loc_words = {w for w in s_loc.split() if len(w) > 2 and w not in STOP_WORDS}
             if s_loc_words and s_loc_words.intersection(q_tokens):
                 loc_score = 0.8
+            else:
+                # Require location match so unrelated flagship scenarios are never matched without location
+                continue
 
         # 2. Category / Concept score (0.0 to 1.0)
         cat_score = 0.0
@@ -199,47 +233,23 @@ def find_matching_scenario(
             cat_score = 0.8
         elif s_cat == "ocean_marine" and any(k in norm_query for k in ["ocean", "marine", "wave", "sea"]):
             cat_score = 0.9
+        elif any(k in norm_query for k in ["terrain", "elevation", "surface", "heatmap", "concentration", "point", "detected"]):
+            cat_score = 0.75
 
         # 3. Token overlap Jaccard score (0.0 to 1.0)
         token_overlap = len(q_tokens.intersection(s_tokens))
         union_len = len(q_tokens.union(s_tokens)) or 1
         jaccard = token_overlap / union_len
 
-        # Combined weighted score
-        # If query has location: location match is crucial
-        if query_location:
-            total_score = (loc_score * 0.50) + (cat_score * 0.30) + (jaccard * 0.20)
-        else:
-            # For queries without explicit location, require strong keyword overlap
-            total_score = (cat_score * 0.40) + (jaccard * 0.60)
+        # Combined weighted score: require BOTH valid location AND concept relevance
+        if cat_score < 0.3 and jaccard < 0.15:
+            continue
+        total_score = (loc_score * 0.40) + (cat_score * 0.40) + (jaccard * 0.20)
 
         if total_score >= threshold:
             scored_matches.append((total_score, s))
 
     if not scored_matches:
-        # If the query specifies an unknown location (e.g. Kathmandu, Paris, etc.), do not force a fallback
-        loc_candidates = re.findall(r"\b(?:in|around|near|across|over|at|for)\s+([a-z]+)\b", norm_query)
-        if any(c not in STOP_WORDS and c not in LOCATION_ALIASES and len(c) > 3 for c in loc_candidates):
-            return None
-
-        # Deterministic concept mapping to existing flagship scenarios for location-agnostic queries
-        scenario_map = {s.get("id"): s for s in scenarios}
-        if any(k in norm_query for k in ["land cover", "lulc", "class distribution", "classes", "water and built", "built and water", "vegetation and built"]):
-            return scenario_map.get("LULC-001") or scenario_map.get("MUL-002")
-        elif any(k in norm_query for k in ["urban", "built-up", "built up", "expansion", "sprawl", "growth"]):
-            return scenario_map.get("URB-006") or scenario_map.get("URB-001")
-        elif any(k in norm_query for k in ["flood", "inundat", "submerged", "lake shrinkage", "water body", "water change"]):
-            return scenario_map.get("FLD-006") or scenario_map.get("FLD-001")
-        elif any(k in norm_query for k in ["sar", "radar", "backscatter", "polariz", "sentinel-1"]):
-            return scenario_map.get("SAR-001")
-        elif any(k in norm_query for k in ["wildfire", "fire", "burn", "dnbr"]):
-            return scenario_map.get("FIR-001")
-        elif any(k in norm_query for k in ["crop", "agriculture", "wheat", "paddy"]):
-            return scenario_map.get("AGR-001")
-        elif any(k in norm_query for k in ["ocean", "marine", "wave", "sst"]):
-            return scenario_map.get("OCN-001")
-        elif any(k in norm_query for k in ["ndvi", "vegetation", "forest", "canopy", "greenery", "spectral", "elevation", "terrain", "rainfall", "correlation"]):
-            return scenario_map.get("VEG-001")
         return None
 
     # Sort descending by score

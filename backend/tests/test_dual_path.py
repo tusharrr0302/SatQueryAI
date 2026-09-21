@@ -1,8 +1,44 @@
 import pytest
+from unittest.mock import patch, MagicMock
 from fastapi.testclient import TestClient
 from app.main import app
 
 client = TestClient(app, headers={"Authorization": "Bearer test_token_analyst"})
+
+
+@pytest.fixture(autouse=True)
+def mock_imagery_fetch(monkeypatch):
+    import numpy as np
+    from pathlib import Path
+    from app.imagery.planetary_computer import SceneData
+    from app.config import settings
+
+    monkeypatch.setattr(settings, "ALLOW_MOCK_FALLBACK", True)
+    monkeypatch.setattr(settings, "PRITHVI_WORKER_URL", None)
+    monkeypatch.setattr(settings, "CHANGE_DETECTION_WORKER_URL", None)
+    monkeypatch.setattr(settings, "CLOSP_WORKER_URL", None)
+    monkeypatch.setattr(settings, "EARTHDIAL_WORKER_URL", None)
+
+    output_dir = Path(__file__).resolve().parents[1] / settings.IMAGE_OUTPUT_DIR
+    output_dir.mkdir(parents=True, exist_ok=True)
+    dummy_img = output_dir / "test_dual_scene.png"
+    dummy_img.touch(exist_ok=True)
+
+    dummy_scene = SceneData(
+        item_id="S2_test_dual_scene",
+        date="2024-01-01",
+        red=np.full((10, 10), 0.2),
+        green=np.full((10, 10), 0.3),
+        blue=np.full((10, 10), 0.1),
+        nir=np.full((10, 10), 0.5),
+        profile={"transform": MagicMock(a=10, e=-10, b=0, d=0)},
+        cloud_cover=5.0,
+        true_color_path=dummy_img,
+        pixel_area_km2=0.0001,
+    )
+
+    with patch("app.models.manager.fetch_before_after_and_series", return_value=(dummy_scene, dummy_scene, [dummy_scene])):
+        yield
 
 
 def test_known_scenario_uttarakhand_exact():

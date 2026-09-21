@@ -273,9 +273,10 @@ def scenario_to_normalized_result(scenario: Dict[str, Any], user_query: str = ""
     provenance = Provenance(
         source="mock",
         worker_url=None,
-        fallback=False,
+        fallback=True,
         model_id=model_id,
         model_name=model_name,
+
         dataset_ids=dataset_ids,
         acquisition_dates=acq_dates,
         pipeline="ATS / LangGraph",

@@ -38,3 +38,7 @@ frontend/src-tauri/gen/
 *.sqlite
 backend/satquery.db
 full_prompt_*.txt
+
+# Logs
+logs/
+*.log

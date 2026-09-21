@@ -19,7 +19,19 @@ from app.db.models import User
 
 logger = logging.getLogger(__name__)
 
+
+class AuthenticationError(HTTPException):
+    """Raised when authentication fails or unverified decode is attempted in production."""
+    def __init__(self, detail: str = "Invalid or expired authentication token"):
+        super().__init__(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail=detail,
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+
+
 security = HTTPBearer(auto_error=False)
+
 
 # Cache for JWKS client to avoid fetching keys on every request
 _jwks_client: Optional[PyJWKClient] = None
@@ -69,7 +81,7 @@ def verify_clerk_token(token: str) -> Dict[str, Any]:
         )
 
     # In test/dev environment where test tokens are passed
-    if token.startswith("test_token_"):
+    if (settings.ENVIRONMENT or "").lower() != "production" and token.startswith("test_token_"):
         clerk_id = token.replace("test_token_", "user_")
         return {
             "sub": clerk_id,
@@ -105,7 +117,12 @@ def verify_clerk_token(token: str) -> Dict[str, Any]:
         except jwt.PyJWTError as e:
             logger.warning(f"JWKS verification failed: {e}. Trying fallback decode.")
 
-    # Fallback: decode unverified if secret key or dev mode
+
+    # Guard: Unverified JWT decode is strictly prohibited in production
+    if (settings.ENVIRONMENT or "").lower() == "production":
+        raise AuthenticationError("Unverified JWT decode prohibited in production")
+
+    # Fallback: decode unverified for local development/testing ONLY
     if settings.CLERK_SECRET_KEY or not settings.CLERK_PUBLISHABLE_KEY:
         try:
             unverified = jwt.decode(token, options={"verify_signature": False})
@@ -114,11 +131,8 @@ def verify_clerk_token(token: str) -> Dict[str, Any]:
         except Exception as e:
             logger.warning(f"Clerk unverified decode fallback error: {e}")
 
-    raise HTTPException(
-        status_code=status.HTTP_401_UNAUTHORIZED,
-        detail="Invalid or expired authentication token",
-        headers={"WWW-Authenticate": "Bearer"},
-    )
+    raise AuthenticationError("Invalid or expired authentication token")
+
 
 
 def get_current_user(
@@ -153,7 +167,7 @@ def get_current_user(
             headers={"WWW-Authenticate": "Bearer"},
         )
 
-    # Find or create user in database
+    # Find or create user in database with race-condition protection
     user = db.query(User).filter(User.clerk_user_id == clerk_user_id).first()
     if not user:
         email = claims.get("email") or claims.get("primary_email_address")
@@ -163,14 +177,64 @@ def get_current_user(
             email=email,
             display_name=name,
         )
-        db.add(user)
-        db.commit()
-        db.refresh(user)
-        logger.info(f"[Auth] Created new application user record for Clerk ID: {clerk_user_id}")
+        try:
+            db.add(user)
+            db.commit()
+            db.refresh(user)
+            logger.info(f"[Auth] Created new application user record for Clerk ID: {clerk_user_id}")
+        except Exception:
+            db.rollback()
+            user = db.query(User).filter(User.clerk_user_id == clerk_user_id).first()
     else:
         # Update last seen timestamp
         from datetime import datetime
         user.last_seen_at = datetime.utcnow()
-        db.commit()
+        try:
+            db.commit()
+        except Exception:
+            db.rollback()
 
     return user
+
+
+def get_optional_user(
+    request: Request,
+    credentials: Optional[HTTPAuthorizationCredentials] = Depends(security),
+    db: Session = Depends(get_db),
+) -> Optional[User]:
+    """
+    Optional authentication dependency: resolves authenticated User if valid token is provided,
+    otherwise returns None without raising 401. Enables public catalog discovery.
+    """
+    token = None
+    if credentials:
+        token = credentials.credentials
+    elif "token" in request.query_params:
+        token = request.query_params["token"]
+
+    if not token:
+        return None
+
+    try:
+        claims = verify_clerk_token(token)
+        clerk_user_id = claims.get("sub")
+        if not clerk_user_id:
+            return None
+        user = db.query(User).filter(User.clerk_user_id == clerk_user_id).first()
+        if not user:
+            user = User(
+                clerk_user_id=clerk_user_id,
+                email=claims.get("email") or claims.get("primary_email_address"),
+                display_name=claims.get("name") or claims.get("display_name"),
+            )
+            try:
+                db.add(user)
+                db.commit()
+                db.refresh(user)
+            except Exception:
+                db.rollback()
+                user = db.query(User).filter(User.clerk_user_id == clerk_user_id).first()
+        return user
+    except Exception:
+        return None
+

@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { currentResult } from '../stores';
+  import { currentResult, activeVisualizationPlan } from '../stores';
   import EChartRenderer from './EChartRenderer.svelte';
 
   import {
@@ -7,7 +7,9 @@
     Calendar,
     Info,
     Box,
-    Activity
+    Activity,
+    ChevronDown,
+    ChevronUp
   } from 'lucide-svelte';
 
 
@@ -30,6 +32,8 @@
 
   let viewDimension:
     '2d' | '3d' = '2d';
+
+  let showExplanationDrawer = false;
 
 
   $: if (
@@ -100,6 +104,12 @@
           <span class="type-badge">
             {(currentVis.type || 'chart').toUpperCase()}
           </span>
+
+          {#if selectedVisIndex === 0 && $activeVisualizationPlan}
+            <span class="primary-tag">
+              PRIMARY
+            </span>
+          {/if}
 
         {/if}
 
@@ -212,9 +222,64 @@
 
       {/if}
 
+      <!-- WHY THIS VIEW EXPLANATION BUTTON -->
+      {#if $activeVisualizationPlan?.explanation}
+        <button
+          class="why-chosen-btn"
+          class:active={showExplanationDrawer}
+          on:click={() => (showExplanationDrawer = !showExplanationDrawer)}
+          title="Authoritative reasoning for why this visualization was selected"
+        >
+          <Info size={11} />
+          <span>Why this view</span>
+          {#if showExplanationDrawer}
+            <ChevronUp size={11} />
+          {:else}
+            <ChevronDown size={11} />
+          {/if}
+        </button>
+      {/if}
+
     </div>
 
   </div>
+
+  <!-- REASONING DRAWER -->
+  {#if showExplanationDrawer && $activeVisualizationPlan?.explanation}
+    {@const exp = $activeVisualizationPlan.explanation}
+    <div class="explanation-drawer">
+      <div class="drawer-header">
+        <span class="drawer-tag">VISUALIZATION REASONING</span>
+        <span class="drawer-form">{exp.visual_form || 'Selected Analytical Form'}</span>
+      </div>
+      <div class="drawer-grid">
+        {#if exp.what_this_represents}
+          <div class="drawer-cell">
+            <span class="cell-label">REPRESENTS</span>
+            <p class="cell-text">{exp.what_this_represents}</p>
+          </div>
+        {/if}
+        {#if exp.primary_metric}
+          <div class="drawer-cell">
+            <span class="cell-label">PRIMARY METRIC</span>
+            <p class="cell-text">{exp.primary_metric}</p>
+          </div>
+        {/if}
+        {#if exp.visual_inferences}
+          <div class="drawer-cell">
+            <span class="cell-label">INFERENCE</span>
+            <p class="cell-text">{exp.visual_inferences}</p>
+          </div>
+        {/if}
+        {#if exp.limitations}
+          <div class="drawer-cell">
+            <span class="cell-label">LIMITATIONS</span>
+            <p class="cell-text">{exp.limitations}</p>
+          </div>
+        {/if}
+      </div>
+    </div>
+  {/if}
 
 
   <!-- =====================================================
@@ -1377,4 +1442,98 @@
     }
   }
 
+  .primary-tag {
+    font-size: 8px;
+    font-weight: 800;
+    color: #48bb78;
+    background: rgba(72, 187, 120, 0.12);
+    border: 1px solid rgba(72, 187, 120, 0.25);
+    padding: 1px 5px;
+    border-radius: 3px;
+    letter-spacing: 0.05em;
+  }
+
+  .why-chosen-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    background: rgba(66, 153, 225, 0.1);
+    border: 1px solid rgba(66, 153, 225, 0.22);
+    color: #63b3ed;
+    font-size: 10.5px;
+    font-weight: 500;
+    padding: 3px 8px;
+    border-radius: 5px;
+    cursor: pointer;
+    transition: all 0.15s ease;
+  }
+
+  .why-chosen-btn:hover, .why-chosen-btn.active {
+    background: rgba(66, 153, 225, 0.2);
+    color: #90cdf4;
+    border-color: rgba(66, 153, 225, 0.35);
+  }
+
+  .explanation-drawer {
+    background: rgba(10, 14, 22, 0.95);
+    border-bottom: 1px solid rgba(66, 153, 225, 0.2);
+    padding: 10px 14px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    animation: fadeIn 0.18s ease-out;
+  }
+
+  .drawer-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+  }
+
+  .drawer-tag {
+    font-size: 9px;
+    font-weight: 700;
+    letter-spacing: 0.05em;
+    color: #63b3ed;
+  }
+
+  .drawer-form {
+    font-size: 10px;
+    color: rgba(255, 255, 255, 0.5);
+  }
+
+  .drawer-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 8px;
+  }
+
+  .drawer-cell {
+    background: rgba(255, 255, 255, 0.02);
+    border: 1px solid rgba(255, 255, 255, 0.04);
+    border-radius: 4px;
+    padding: 6px 8px;
+  }
+
+  .cell-label {
+    display: block;
+    font-size: 8px;
+    font-weight: 700;
+    color: rgba(255, 255, 255, 0.4);
+    letter-spacing: 0.05em;
+    margin-bottom: 2px;
+  }
+
+  .cell-text {
+    margin: 0;
+    font-size: 11px;
+    color: #e2e8f0;
+    line-height: 1.35;
+  }
+
+  @keyframes fadeIn {
+    from { opacity: 0; transform: translateY(-4px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
 </style>

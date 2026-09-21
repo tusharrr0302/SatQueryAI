@@ -36,7 +36,9 @@ def test_list_models():
     assert "closp" in ids
 
 
-def test_chat_delhi_vegetation():
+def test_chat_delhi_vegetation(monkeypatch):
+    from app.config import settings
+    monkeypatch.setattr(settings, "EO_EXECUTION_MODE", "mock")
     query = "Show me the vegetation change in Delhi over the last 1 year using Sentinel-2 data."
     response = client.post("/api/chat", json={"query": query})
     assert response.status_code == 200
@@ -49,7 +51,9 @@ def test_chat_delhi_vegetation():
     assert data["globe_action"]["action"] == "fly_to"
 
 
-def test_chat_delhi_decadal():
+def test_chat_delhi_decadal(monkeypatch):
+    from app.config import settings
+    monkeypatch.setattr(settings, "EO_EXECUTION_MODE", "mock")
     query = "Show me how Delhi changed over the last 10 years"
     response = client.post("/api/chat", json={"query": query})
     assert response.status_code == 200
@@ -57,6 +61,7 @@ def test_chat_delhi_decadal():
     assert "result" in data
     assert "Urban expansion" in [m["label"] for m in data["result"]["metrics"]]
     assert data["result"]["provenance"]["model_name"] == "Prithvi-EO-2.0"
+
 
 
 def test_aoi_crud():

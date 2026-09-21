@@ -165,10 +165,15 @@ def test_registry_user_uploaded_asset_layer_isolation():
     assert "kanpur_sentinel2.tif" in user_layer.title
 
 
-def test_api_chat_returns_authoritative_layers():
+AUTH_HEADERS = {"Authorization": "Bearer test_token_analyst"}
+
+
+def test_api_chat_returns_authoritative_layers(monkeypatch):
     """Verify /api/chat includes layers in top-level response and assistant_message."""
+    from app.config import settings
+    monkeypatch.setattr(settings, "EO_EXECUTION_MODE", "mock")
     query = "How much vegetation has been lost in Uttarakhand between 2020 and 2024?"
-    response = client.post("/api/chat", json={"query": query})
+    response = client.post("/api/chat", json={"query": query}, headers=AUTH_HEADERS)
     assert response.status_code == 200
     data = response.json()
 
@@ -191,16 +196,18 @@ def test_api_chat_returns_authoritative_layers():
     assert "change_detection" in layer_types
 
 
-def test_api_layers_endpoints():
+def test_api_layers_endpoints(monkeypatch):
     """Verify GET /api/layers and GET /api/layers/{layer_id}."""
+    from app.config import settings
+    monkeypatch.setattr(settings, "EO_EXECUTION_MODE", "mock")
     # First invoke chat to establish active layers in conversation
-    chat_resp = client.post("/api/chat", json={"query": "Show the flooding caused by Storm Daniel in Derna"})
+    chat_resp = client.post("/api/chat", json={"query": "Show the flooding caused by Storm Daniel in Derna"}, headers=AUTH_HEADERS)
     assert chat_resp.status_code == 200
     chat_data = chat_resp.json()
     conv_id = chat_data["conversation_id"]
 
     # List layers endpoint
-    list_resp = client.get(f"/api/layers?conversation_id={conv_id}")
+    list_resp = client.get(f"/api/layers?conversation_id={conv_id}", headers=AUTH_HEADERS)
     assert list_resp.status_code == 200
     layers = list_resp.json().get("layers", [])
     assert len(layers) >= 2
@@ -211,7 +218,7 @@ def test_api_layers_endpoints():
 
     # Single layer specification endpoint
     layer_id = flood_layer["layer_id"]
-    spec_resp = client.get(f"/api/layers/{layer_id}?conversation_id={conv_id}")
+    spec_resp = client.get(f"/api/layers/{layer_id}?conversation_id={conv_id}", headers=AUTH_HEADERS)
     assert spec_resp.status_code == 200
     spec = spec_resp.json()
     assert spec["layer_id"] == layer_id

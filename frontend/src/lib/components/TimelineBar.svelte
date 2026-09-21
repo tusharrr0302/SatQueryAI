@@ -140,9 +140,7 @@
   // CLEANUP
   // =========================================================
 
-  onDestroy(() => {
-    stopPlayback();
-  });
+  $: activeObs = $timelineState.observations?.find(o => String(o.year || o.period_label) === $timelineState.activeYear) || null;
 </script>
 
 
@@ -230,44 +228,52 @@
        ===================================================== -->
 
   <div class="timeline-track">
-
-    {#if $timelineState.years.length}
-
-      <!-- Timeline line -->
-
+    {#if $timelineState.observations && $timelineState.observations.length}
       <div class="timeline-line"></div>
-
-
-      {#each $timelineState.years as yr, i}
-
+      {#each $timelineState.observations as obs}
+        {@const yrStr = String(obs.year || obs.period_label)}
+        {@const isAvail = obs.status === 'ready'}
+        {@const tooltip = isAvail 
+          ? `${yrStr} • Ready • Cloud: ${obs.cloud_cover != null ? obs.cloud_cover.toFixed(1) + '%' : '0%'} • ${obs.dataset_id || 'Sentinel-2'}`
+          : `${yrStr} • Unavailable: ${obs.reason || 'Cloud Cover Threshold Failed'}`}
         <button
           class="year-tick"
-          class:active={
-            $timelineState.activeYear === yr
-          }
+          class:active={$timelineState.activeYear === yrStr}
+          class:unavailable={!isAvail}
+          on:click={() => selectYear(yrStr)}
+          title={tooltip}
+          aria-label={tooltip}
+        >
+          <span 
+            class="tick-dot"
+            class:ready={obs.status === 'ready'}
+            class:unavailable={obs.status === 'unavailable'}
+            class:warning={obs.status === 'low_confidence'}
+          ></span>
+          <span class="tick-label" class:text-dim={!isAvail}>
+            {yrStr}
+          </span>
+        </button>
+      {/each}
+    {:else if $timelineState.years.length}
+      <div class="timeline-line"></div>
+      {#each $timelineState.years as yr}
+        <button
+          class="year-tick"
+          class:active={$timelineState.activeYear === yr}
           on:click={() => selectYear(yr)}
           title={`View ${yr}`}
           aria-label={`View ${yr}`}
         >
-
-          <span class="tick-dot"></span>
-
-          <span class="tick-label">
-            {yr}
-          </span>
-
+          <span class="tick-dot ready"></span>
+          <span class="tick-label">{yr}</span>
         </button>
-
       {/each}
-
     {:else}
-
       <span class="empty-timeline">
         No timeline data
       </span>
-
     {/if}
-
   </div>
 
 
@@ -286,16 +292,23 @@
     <div class="active-year-content">
 
       <span class="active-year-label">
-        YEAR
+        ACQUISITION
       </span>
 
       <span class="active-badge">
         {$timelineState.activeYear || '—'}
       </span>
 
+      {#if activeObs}
+        <span class="obs-status-pill" class:ready={activeObs.status === 'ready'} class:unavailable={activeObs.status === 'unavailable'}>
+          {activeObs.status === 'ready' ? (activeObs.cloud_cover != null ? `${activeObs.cloud_cover.toFixed(1)}% Cloud` : 'Ready') : (activeObs.reason ? activeObs.reason.replace(/_/g, ' ') : 'Unavailable')}
+        </span>
+      {/if}
+
     </div>
 
   </div>
+
 
 </div>
 
@@ -841,7 +854,7 @@
   }
 
 
-  .clock-icon {
+  :global(.clock-icon) {
 
     color:
       rgba(255,255,255,0.40);

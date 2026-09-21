@@ -786,7 +786,7 @@
   }
 
 
-  .search-icon {
+  :global(.search-icon) {
 
     flex-shrink:
       0;
@@ -1614,7 +1614,7 @@
   }
 
 
-  .cap-tag svg {
+  .cap-tag :global(svg) {
 
     color:
       rgba(255,255,255,0.42);

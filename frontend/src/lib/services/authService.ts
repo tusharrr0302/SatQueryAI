@@ -231,10 +231,17 @@ export async function initAuth(): Promise<Clerk | null> {
 export async function getAuthToken(): Promise<string | null> {
   try {
     const clerk = await initAuth();
-    if (!clerk || !clerk.session) return null;
+    if (!clerk || !clerk.session) {
+      // In local development without Clerk key configured, provide dev analyst token
+      if (!PUBLISHABLE_KEY) {
+        return 'test_token_analyst';
+      }
+      return null;
+    }
     return await clerk.session.getToken();
   } catch (err) {
     console.warn('[SatQuery Auth] Error getting session token:', err);
+    if (!PUBLISHABLE_KEY) return 'test_token_analyst';
     return null;
   }
 }

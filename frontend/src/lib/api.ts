@@ -23,7 +23,13 @@ export async function apiFetch(path: string, options: RequestInit = {}): Promise
   });
 }
 
-export async function sendChatQuery(query: string, conversationId?: string, activeAssetId?: string) {
+export async function sendChatQuery(
+  query: string,
+  conversationId?: string,
+  activeAssetId?: string,
+  requestId?: string,
+  aiMode?: string,
+) {
   const controller = new AbortController();
   const timeout = window.setTimeout(() => controller.abort(), 300000);
   let resp: Response;
@@ -35,6 +41,8 @@ export async function sendChatQuery(query: string, conversationId?: string, acti
         query,
         conversation_id: conversationId || undefined,
         active_asset_id: activeAssetId || undefined,
+        request_id: requestId || undefined,
+        ai_mode: aiMode || undefined,
       }),
       signal: controller.signal,
     });
@@ -48,17 +56,21 @@ export async function sendChatQuery(query: string, conversationId?: string, acti
   } finally {
     window.clearTimeout(timeout);
   }
+
+  const payload = await resp.json().catch(() => null);
+
   if (!resp.ok) {
+    if (payload && payload.assistant_message) {
+      return payload;
+    }
     let detail = `status ${resp.status}`;
-    try {
-      const payload = await resp.json();
-      detail = payload.detail || detail;
-    } catch {
-      // Keep HTTP status
+    if (payload && payload.detail) {
+      detail = payload.detail;
     }
     throw new Error(detail);
   }
-  return await resp.json();
+
+  return payload;
 }
 
 export async function fetchDatasets() {
@@ -76,6 +88,45 @@ export async function fetchModels() {
 export async function fetchAOIs() {
   const resp = await apiFetch('/aoi');
   if (!resp.ok) throw new Error('Failed to fetch AOIs');
+  return await resp.json();
+}
+
+export async function fetchCatalogSummary() {
+  const resp = await apiFetch('/catalog/summary');
+  if (!resp.ok) throw new Error('Failed to fetch catalog summary');
+  return await resp.json();
+}
+
+export async function fetchCatalogDatasets() {
+  const resp = await apiFetch('/catalog/datasets');
+  if (!resp.ok) throw new Error('Failed to fetch catalog datasets');
+  return await resp.json();
+}
+
+export async function fetchCatalogLayers(params?: { search?: string; category?: string; dataset_id?: string }) {
+  const searchParams = new URLSearchParams();
+  if (params?.search) searchParams.set('search', params.search);
+  if (params?.category) searchParams.set('category', params.category);
+  if (params?.dataset_id) searchParams.set('dataset_id', params.dataset_id);
+  const qStr = searchParams.toString();
+  const resp = await apiFetch(`/catalog/layers${qStr ? `?${qStr}` : ''}`);
+  if (!resp.ok) throw new Error('Failed to fetch catalog layers');
+  return await resp.json();
+}
+
+export async function fetchCatalogDatasetDetail(datasetId: string) {
+  const resp = await apiFetch(`/catalog/datasets/${encodeURIComponent(datasetId)}`);
+  if (!resp.ok) throw new Error(`Failed to fetch dataset detail for ${datasetId}`);
+  return await resp.json();
+}
+
+export async function validateCustomLayer(spec: any) {
+  const resp = await apiFetch('/catalog/custom-layer/validate', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(spec),
+  });
+  if (!resp.ok) throw new Error('Failed to validate custom layer');
   return await resp.json();
 }
 

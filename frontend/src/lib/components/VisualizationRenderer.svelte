@@ -49,7 +49,8 @@
       timeSeries ||
       activeMode ||
       metrics ||
-      confidence
+      confidence ||
+      analysisType
     )
   ) {
     renderChart();
@@ -132,107 +133,32 @@
 
 
   /* =========================================================
-     SURFACE DATA
+     SURFACE DATA (Strictly real data - zero synthetic math)
      ========================================================= */
 
   function getSurfaceData(
     grid?: number[][]
   ): [number, number, number][] {
+    if (!grid || !grid.length) {
+      return [];
+    }
 
-    const data:
-      [number, number, number][] = [];
+    const data: [number, number, number][] = [];
+    const rows = grid.length;
+    const cols = grid[0]?.length || rows;
 
-    const g =
-      grid && grid.length
-        ? grid
-        : defaultSurfaceGrid();
-
-    const rows =
-      g.length;
-
-    const cols =
-      g[0]?.length || rows;
-
-
-    for (
-      let r = 0;
-      r < rows;
-      r++
-    ) {
-
-      for (
-        let c = 0;
-        c < cols;
-        c++
-      ) {
-
-        data.push([
-          c,
-          r,
-          g[r][c]
-        ]);
+    for (let r = 0; r < rows; r++) {
+      for (let c = 0; c < cols; c++) {
+        const val = grid[r][c];
+        if (typeof val === 'number' && !isNaN(val)) {
+          data.push([c, r, val]);
+        }
       }
     }
 
     return data;
   }
 
-
-  /* =========================================================
-     DEFAULT SURFACE
-     ========================================================= */
-
-  function defaultSurfaceGrid(): number[][] {
-
-    const rows = 16;
-    const cols = 16;
-
-    const res: number[][] = [];
-
-
-    for (
-      let r = 0;
-      r < rows;
-      r++
-    ) {
-
-      const row: number[] = [];
-
-
-      for (
-        let c = 0;
-        c < cols;
-        c++
-      ) {
-
-        const val =
-          0.35 +
-          (r * 0.02) -
-          (c * 0.015) +
-          (Math.sin(r * 0.6) * 0.22) +
-          (Math.cos(c * 0.6) * 0.18);
-
-
-        row.push(
-          Math.round(
-            Math.max(
-              -0.2,
-              Math.min(
-                0.8,
-                val
-              )
-            ) * 100
-          ) / 100
-        );
-      }
-
-
-      res.push(row);
-    }
-
-
-    return res;
-  }
 
 
   /* =========================================================
@@ -253,80 +179,59 @@
 
     try {
 
-      if (mode === '3D Surface') {
-
+      if (mode === '3D Surface' || mode === '3d_surface' || mode === 'surface' || mode === 'terrain') {
         render3DSurface();
-
+      } else if (mode === '3D Point Cloud' || mode === 'Point Cloud' || mode === 'point_cloud' || mode === '3d_point_cloud') {
+        render3DPointCloud();
       } else if (
         mode === 'Time Series' ||
-        mode === 'Line Chart'
+        mode === 'Line Chart' ||
+        mode === 'line' ||
+        mode === 'time_series'
       ) {
-
         renderTimeSeries();
-
       } else if (
         mode === 'Change Metrics' ||
         mode === 'Bar Chart'
       ) {
-
         renderChangeMetrics();
-
       } else if (
         mode === 'Area Chart'
       ) {
-
         renderAreaChart();
-
       } else if (
         mode === 'Class-wise Change'
       ) {
-
         renderClassWiseChange();
-
       } else if (
         mode === 'Heatmap'
       ) {
-
         renderHeatmap();
-
       } else if (
         mode === 'Scatter' ||
         mode === 'Scatter / Correlation'
       ) {
-
         renderScatter();
-
       } else if (
         mode === 'NDVI Trend'
       ) {
-
         renderNdviTrend();
-
       } else if (
         mode === 'Confidence'
       ) {
-
         renderConfidenceGauge();
-
       } else {
-
-        if (spec?.surface_grid) {
-
+        if (spec?.surface_grid && spec.surface_grid.length) {
           render3DSurface();
-
         } else {
-
           renderTimeSeries();
         }
       }
-
     } catch (err) {
-
       console.warn(
         'ECharts rendering error, falling back to 2D timeseries:',
         err
       );
-
       renderTimeSeries();
     }
   }
@@ -337,13 +242,25 @@
      ========================================================= */
 
   function render3DSurface() {
-
     if (!chart) return;
 
-    const surfaceData =
-      getSurfaceData(
-        spec?.surface_grid
-      );
+    const surfaceData = getSurfaceData(spec?.surface_grid);
+    if (!surfaceData.length) {
+      chart.setOption({
+        backgroundColor: 'transparent',
+        title: {
+          text: '3D Scientific Surface Unavailable',
+          subtext: 'Awaiting authentic Copernicus DEM elevation GeoTIFF or Sentinel-2 raster grid telemetry.',
+          left: 'center',
+          top: 'middle',
+          textStyle: { color: '#94a3b8', fontSize: 13, fontWeight: 'normal' },
+          subtextStyle: { color: '#64748b', fontSize: 11 },
+        },
+        series: [],
+      }, true);
+      return;
+    }
+
 
     const minVal =
       spec?.legend_min ?? -0.2;
@@ -703,59 +620,164 @@
 
 
   /* =========================================================
+     1B. 3D POINT CLOUD (Strictly real sampled points)
+     ========================================================= */
+
+  function render3DPointCloud() {
+    if (!chart) return;
+
+    const surfaceData = getSurfaceData(spec?.surface_grid);
+    if (!surfaceData.length) {
+      chart.setOption({
+        backgroundColor: 'transparent',
+        title: {
+          text: '3D Scientific Point Cloud Unavailable',
+          subtext: 'Awaiting authentic continuous raster grid measurements.',
+          left: 'center',
+          top: 'middle',
+          textStyle: { color: '#94a3b8', fontSize: 13, fontWeight: 'normal' },
+          subtextStyle: { color: '#64748b', fontSize: 11 },
+        },
+        series: [],
+      }, true);
+      return;
+    }
+
+    const minVal = spec?.legend_min ?? -0.2;
+    const maxVal = spec?.legend_max ?? 0.8;
+    const unit = spec?.legend_unit || 'VALUE';
+
+    const option: any = {
+      backgroundColor: 'transparent',
+      tooltip: {
+        backgroundColor: TOOLTIP_BG,
+        borderColor: BORDER,
+        borderWidth: 1,
+        textStyle: { color: WHITE_SOFT, fontSize: 11 },
+        formatter: (params: any) => {
+          if (!params?.data) return '';
+          const [c, r, v] = params.data;
+          return `<div style="font-family:monospace;font-size:11px;">
+            <div style="color:#94a3b8">Sampled Spatial Pixel</div>
+            <div>Lon Grid: <b style="color:#f8fafc">${c}</b></div>
+            <div>Lat Grid: <b style="color:#f8fafc">${r}</b></div>
+            <div>Intensity: <b style="color:#10b981">${typeof v === 'number' ? v.toFixed(3) : v} ${unit}</b></div>
+          </div>`;
+        },
+      },
+      visualMap: {
+        show: true,
+        dimension: 2,
+        min: minVal,
+        max: maxVal,
+        inRange: {
+          color: ['#0f172a', '#1e3a5f', '#0284c7', '#10b981', '#fbbf24', '#ef4444'],
+        },
+        textStyle: { color: WHITE_MUTED, fontSize: 10 },
+        bottom: 12,
+        left: 12,
+        itemWidth: 12,
+        itemHeight: 80,
+      },
+      xAxis3D: {
+        type: 'value',
+        name: 'LON GRID',
+        nameTextStyle: { color: WHITE_MUTED, fontSize: 9 },
+        axisLine: { lineStyle: { color: AXIS } },
+        splitLine: { lineStyle: { color: GRID } },
+        axisLabel: { color: WHITE_MUTED, fontSize: 9 },
+      },
+      yAxis3D: {
+        type: 'value',
+        name: 'LAT GRID',
+        nameTextStyle: { color: WHITE_MUTED, fontSize: 9 },
+        axisLine: { lineStyle: { color: AXIS } },
+        splitLine: { lineStyle: { color: GRID } },
+        axisLabel: { color: WHITE_MUTED, fontSize: 9 },
+      },
+      zAxis3D: {
+        type: 'value',
+        name: unit,
+        min: minVal,
+        max: maxVal,
+        nameTextStyle: { color: WHITE_SOFT, fontSize: 9 },
+        axisLine: { lineStyle: { color: AXIS } },
+        splitLine: { lineStyle: { color: GRID } },
+        axisLabel: { color: WHITE_MUTED, fontSize: 9 },
+      },
+      grid3D: {
+        boxWidth: 100,
+        boxDepth: 100,
+        boxHeight: 35,
+        environment: '#05070a',
+        viewControl: {
+          projection: 'perspective',
+          autoRotate: false,
+          alpha: 35,
+          beta: 40,
+          distance: 170,
+          panSensitivity: 1,
+          rotateSensitivity: 1,
+          zoomSensitivity: 1,
+        },
+        light: {
+          main: { intensity: 1.2, shadow: true, alpha: 45, beta: 60 },
+          ambient: { intensity: 0.4 },
+        },
+      },
+      series: [
+        {
+          type: 'scatter3D',
+          name: 'Point Cloud',
+          data: surfaceData,
+          symbolSize: 4.5,
+          itemStyle: {
+            opacity: spec?.surface_opacity ?? 0.85,
+          },
+          shading: 'realistic',
+        },
+      ],
+    };
+
+    chart.setOption(option, true);
+  }
+
+
+  /* =========================================================
      2. TIME SERIES
      ========================================================= */
 
   function renderTimeSeries() {
-
     if (!chart) return;
 
+    const rawPts = (timeSeries && timeSeries.length)
+      ? timeSeries
+      : (spec?.timeseries && spec.timeseries.length ? spec.timeseries : (spec?.data && spec.data.length ? spec.data : []));
 
-    const pts =
-      timeSeries &&
-      timeSeries.length
-        ? timeSeries
-        : [
-            {
-              date: '2016',
-              value: 627.1
-            },
-            {
-              date: '2018',
-              value: 654.8
-            },
-            {
-              date: '2020',
-              value: 689.4
-            },
-            {
-              date: '2022',
-              value: 718.3
-            },
-            {
-              date: '2024',
-              value: 743.9
-            },
-            {
-              date: '2026',
-              value: 761.3
-            }
-          ];
+    if (!rawPts.length) {
+      chart.setOption({
+        backgroundColor: 'transparent',
+        title: {
+          text: 'Longitudinal Time Series Unavailable',
+          subtext: 'No multi-temporal satellite scene observations are available for this area of interest.',
+          left: 'center',
+          top: 'middle',
+          textStyle: { color: '#94a3b8', fontSize: 13, fontWeight: 'normal' },
+          subtextStyle: { color: '#64748b', fontSize: 11 },
+        },
+        series: [],
+      }, true);
+      return;
+    }
 
+    const dates = rawPts.map((p: any) => p.label || p.date);
+    const values = rawPts.map((p: any) => {
+      if (p.status === 'unavailable' || p.value === null || p.value === undefined) {
+        return null;
+      }
+      return Number(p.value);
+    });
 
-    const dates =
-      pts.map(
-        p =>
-          p.label ||
-          p.date
-      );
-
-
-    const values =
-      pts.map(
-        p =>
-          p.value
-      );
 
 
     const option: any = {
@@ -818,14 +840,11 @@
 
 
       grid: {
-
         left: 48,
-
         right: 24,
-
         top: 28,
-
-        bottom: 32
+        bottom: 32,
+        containLabel: true
       },
 
 
@@ -908,6 +927,9 @@
 
           smooth:
             true,
+
+          connectNulls:
+            false,
 
           showSymbol:
             true,
@@ -1042,14 +1064,11 @@
 
 
       grid: {
-
         left: 110,
-
         right: 30,
-
         top: 20,
-
-        bottom: 20
+        bottom: 20,
+        containLabel: true
       },
 
 
@@ -1208,14 +1227,11 @@
 
 
       grid: {
-
         left: 45,
-
         right: 20,
-
         top: 25,
-
-        bottom: 25
+        bottom: 25,
+        containLabel: true
       },
 
 
@@ -1399,14 +1415,11 @@
 
 
       grid: {
-
         left: 40,
-
         right: 20,
-
         top: 35,
-
-        bottom: 25
+        bottom: 25,
+        containLabel: true
       },
 
 
@@ -1574,18 +1587,26 @@
 
     if (!chart) return;
 
+    const grid = spec?.surface_grid;
+    if (!grid || !grid.length) {
+      chart.setOption({
+        backgroundColor: 'transparent',
+        title: {
+          text: 'Spatial Heatmap Unavailable',
+          subtext: 'Awaiting authentic continuous raster grid measurements.',
+          left: 'center',
+          top: 'middle',
+          textStyle: { color: '#94a3b8', fontSize: 13, fontWeight: 'normal' },
+          subtextStyle: { color: '#64748b', fontSize: 11 },
+        },
+        series: [],
+      }, true);
+      return;
+    }
 
-    const grid =
-      spec?.surface_grid ||
-      defaultSurfaceGrid();
+    const rows = grid.length;
+    const cols = grid[0]?.length || rows;
 
-
-    const rows =
-      grid.length;
-
-    const cols =
-      grid[0]?.length ||
-      rows;
 
 
     const data:
@@ -1641,14 +1662,11 @@
 
 
       grid: {
-
         left: 35,
-
         right: 35,
-
         top: 15,
-
-        bottom: 25
+        bottom: 25,
+        containLabel: true
       },
 
 
@@ -1872,14 +1890,11 @@
 
 
       grid: {
-
         left: 45,
-
         right: 20,
-
         top: 25,
-
-        bottom: 25
+        bottom: 25,
+        containLabel: true
       },
 
 
@@ -2071,14 +2086,11 @@
 
 
       grid: {
-
         left: 40,
-
         right: 20,
-
         top: 25,
-
-        bottom: 25
+        bottom: 25,
+        containLabel: true
       },
 
 

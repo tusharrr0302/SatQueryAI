@@ -39,9 +39,19 @@ app.include_router(ws_router)
 app.include_router(data_router)
 
 
+from app.services.worker_client import check_all_model_workers
+
+
 @app.get("/health")
 def health():
     return {"status": "ok", "app": "SatQuery AI"}
+
+
+@app.get("/health/models")
+@app.get("/api/v1/health/models")
+async def health_models_app():
+    return await check_all_model_workers()
+
 
 
 graph = build_graph()

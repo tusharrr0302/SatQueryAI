@@ -305,6 +305,7 @@
 <div
   class="history-backdrop"
   on:click={closeDrawer}
+  on:keydown={(e) => { if (e.key === 'Escape') closeDrawer(); }}
   role="button"
   tabindex="0"
 >
@@ -317,7 +318,10 @@
   <div
     class="history-drawer"
     on:click|stopPropagation
-    role="region"
+    on:keydown|stopPropagation
+    role="dialog"
+    aria-modal="true"
+    aria-label="Conversation History"
     tabindex="-1"
   >
 
@@ -1189,6 +1193,9 @@
     -webkit-line-clamp:
       2;
 
+    line-clamp:
+      2;
+
     -webkit-box-orient:
       vertical;
 
@@ -1270,7 +1277,7 @@
   }
 
 
-  .meta-tag svg {
+  .meta-tag :global(svg) {
 
     flex-shrink:
       0;
@@ -1365,7 +1372,7 @@
   }
 
 
-  .metric-pill svg {
+  .metric-pill :global(svg) {
 
     color:
       rgba(255,255,255,0.48);

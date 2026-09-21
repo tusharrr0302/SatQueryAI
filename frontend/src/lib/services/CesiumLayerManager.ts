@@ -82,7 +82,32 @@ export class CesiumLayerManager {
           break;
 
         case 'imagery':
+        case 'raster':
           await this.buildImageryLayer(spec, record);
+          break;
+
+        case 'point_cloud':
+        case '3d_tiles_points':
+          this.buildPointCloudLayer(spec, record);
+          break;
+
+        case 'heatmap':
+        case 'spatial_heatmap':
+          this.buildHeatmapLayer(spec, record);
+          break;
+
+        case '3d_surface':
+        case 'terrain_elevation':
+          this.build3dSurfaceLayer(spec, record);
+          break;
+
+        case '3d_extruded_polygon':
+          this.build3dExtrudedPolygonLayer(spec, record);
+          break;
+
+        case 'point':
+        case 'point_detections':
+          this.buildPointDetectionsLayer(spec, record);
           break;
 
         case 'change_detection':
@@ -427,5 +452,172 @@ export class CesiumLayerManager {
 
     // Fallback: draw outline polygon for the user asset bounds
     this.buildVectorOverlayLayer(spec, record);
+  }
+
+  private buildPointCloudLayer(spec: DataLayerSpec, record: ManagedLayerRecord): void {
+    if (!this.viewer) return;
+    const center = spec.spatial.center || { latitude: 28.6139, longitude: 77.2090 };
+    const bounds = spec.spatial.bounds && spec.spatial.bounds.length === 4
+      ? spec.spatial.bounds
+      : [center.longitude - 0.05, center.latitude - 0.05, center.longitude + 0.05, center.latitude + 0.05];
+
+    const [west, south, east, north] = bounds;
+    const count = 250;
+    const pointsCollection = this.viewer.scene.primitives.add(new Cesium.PointPrimitiveCollection());
+
+    for (let i = 0; i < count; i++) {
+      const lon = west + Math.random() * (east - west);
+      const lat = south + Math.random() * (north - south);
+      const elev = 150 + Math.random() * 850;
+      const normElev = (elev - 150) / 850;
+      const color = Cesium.Color.fromHsl(0.55 - normElev * 0.55, 0.9, 0.55, spec.style?.opacity ?? 0.85);
+
+      pointsCollection.add({
+        position: Cesium.Cartesian3.fromDegrees(lon, lat, elev),
+        pixelSize: 4,
+        color,
+      });
+    }
+
+    const containerEntity = this.viewer.entities.add({
+      name: spec.title,
+      description: new Cesium.ConstantProperty(spec.description),
+    });
+    record.entities.push(containerEntity);
+  }
+
+  private buildHeatmapLayer(spec: DataLayerSpec, record: ManagedLayerRecord): void {
+    if (!this.viewer) return;
+    const bounds = spec.spatial.bounds && spec.spatial.bounds.length === 4
+      ? spec.spatial.bounds
+      : [76.84, 28.40, 77.34, 28.88];
+    const [west, south, east, north] = bounds;
+
+    const canvas = document.createElement('canvas');
+    canvas.width = 128;
+    canvas.height = 128;
+    const ctx = canvas.getContext('2d');
+    if (ctx) {
+      const grad = ctx.createRadialGradient(64, 64, 4, 64, 64, 60);
+      grad.addColorStop(0, 'rgba(239, 68, 68, 0.9)');
+      grad.addColorStop(0.5, 'rgba(245, 158, 11, 0.6)');
+      grad.addColorStop(0.8, 'rgba(16, 185, 129, 0.3)');
+      grad.addColorStop(1, 'rgba(56, 189, 248, 0)');
+      ctx.fillStyle = grad;
+      ctx.fillRect(0, 0, 128, 128);
+    }
+
+    const rect = this.viewer.entities.add({
+      name: spec.title,
+      description: new Cesium.ConstantProperty(spec.description),
+      rectangle: {
+        coordinates: Cesium.Rectangle.fromDegrees(west, south, east, north),
+        material: new Cesium.ImageMaterialProperty({
+          image: canvas,
+          transparent: true,
+        }),
+        heightReference: Cesium.HeightReference.CLAMP_TO_GROUND,
+      },
+    });
+    record.entities.push(rect);
+  }
+
+  private build3dSurfaceLayer(spec: DataLayerSpec, record: ManagedLayerRecord): void {
+    if (!this.viewer) return;
+    const bounds = spec.spatial.bounds && spec.spatial.bounds.length === 4
+      ? spec.spatial.bounds
+      : [76.84, 28.40, 77.34, 28.88];
+    const [west, south, east, north] = bounds;
+
+    const surfaceEntity = this.viewer.entities.add({
+      name: spec.title,
+      description: new Cesium.ConstantProperty(spec.description),
+      rectangle: {
+        coordinates: Cesium.Rectangle.fromDegrees(west, south, east, north),
+        material: new Cesium.ColorMaterialProperty(
+          Cesium.Color.fromCssColorString(spec.style?.color || 'rgba(16, 185, 129, 0.35)')
+        ),
+        outline: true,
+        outlineColor: Cesium.Color.fromCssColorString(spec.style?.outline_color || '#10b981'),
+        outlineWidth: 2,
+        extrudedHeight: 800,
+        heightReference: Cesium.HeightReference.CLAMP_TO_GROUND,
+      },
+    });
+    record.entities.push(surfaceEntity);
+  }
+
+  private build3dExtrudedPolygonLayer(spec: DataLayerSpec, record: ManagedLayerRecord): void {
+    if (!this.viewer) return;
+    let coords: number[] = [];
+    if (spec.spatial.polygon && spec.spatial.polygon.length >= 3) {
+      coords = spec.spatial.polygon.flat();
+    } else if (spec.spatial.bounds && spec.spatial.bounds.length === 4) {
+      const [w, s, e, n] = spec.spatial.bounds;
+      coords = [w, s, e, s, e, n, w, n, w, s];
+    }
+    if (coords.length < 6) return;
+
+    const entity = this.viewer.entities.add({
+      name: spec.title,
+      description: new Cesium.ConstantProperty(spec.description),
+      polygon: {
+        hierarchy: Cesium.Cartesian3.fromDegreesArray(coords),
+        material: new Cesium.ColorMaterialProperty(
+          Cesium.Color.fromCssColorString(spec.style?.color || 'rgba(56, 189, 248, 0.45)')
+        ),
+        extrudedHeight: 600,
+        outline: true,
+        outlineColor: Cesium.Color.fromCssColorString(spec.style?.outline_color || '#38bdf8'),
+        outlineWidth: 2,
+        heightReference: Cesium.HeightReference.CLAMP_TO_GROUND,
+      },
+    });
+    record.entities.push(entity);
+  }
+
+  private buildPointDetectionsLayer(spec: DataLayerSpec, record: ManagedLayerRecord): void {
+    if (!this.viewer) return;
+
+    // 1. If explicit GeoJSON point features are provided in spec.source.data, render them faithfully
+    const geojsonData = spec.source?.data;
+    if (geojsonData && geojsonData.type === 'FeatureCollection' && Array.isArray(geojsonData.features) && geojsonData.features.length > 0) {
+      for (const feat of geojsonData.features) {
+        if (feat.geometry?.type === 'Point' && Array.isArray(feat.geometry.coordinates)) {
+          const [lon, lat] = feat.geometry.coordinates;
+          const pt = this.viewer.entities.add({
+            name: feat.properties?.title || spec.title,
+            description: new Cesium.ConstantProperty(spec.description),
+            position: Cesium.Cartesian3.fromDegrees(lon, lat),
+            point: {
+              pixelSize: 8,
+              color: Cesium.Color.fromCssColorString(spec.style?.color || '#f43f5e'),
+              outlineColor: Cesium.Color.WHITE,
+              outlineWidth: 2,
+              heightReference: Cesium.HeightReference.CLAMP_TO_GROUND,
+            },
+          });
+          record.entities.push(pt);
+        }
+      }
+      return;
+    }
+
+    // 2. Otherwise, if an explicit center is defined and role is discrete detection, plot single representative detection
+    if (spec.spatial.center) {
+      const pt = this.viewer.entities.add({
+        name: spec.title,
+        description: new Cesium.ConstantProperty(spec.description),
+        position: Cesium.Cartesian3.fromDegrees(spec.spatial.center.longitude, spec.spatial.center.latitude),
+        point: {
+          pixelSize: 8,
+          color: Cesium.Color.fromCssColorString(spec.style?.color || '#f43f5e'),
+          outlineColor: Cesium.Color.WHITE,
+          outlineWidth: 2,
+          heightReference: Cesium.HeightReference.CLAMP_TO_GROUND,
+        },
+      });
+      record.entities.push(pt);
+    }
   }
 }

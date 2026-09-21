@@ -162,7 +162,7 @@
     gap: 8px;
   }
 
-  .accent-icon {
+  :global(.accent-icon) {
     color: #f8fafc;
   }
 

@@ -8,7 +8,7 @@ from typing import Any
 
 from app.analysis.change_metrics import compute_change_metrics
 from app.config import settings
-from app.geo.resolver import resolve_aoi
+from app.geo.resolver import AOIResolutionError, resolve_aoi
 from app.imagery.planetary_computer import ImageryError, fetch_before_after_and_series
 from app.models.registry import MODEL_REGISTRY
 from app.schemas.normalized_result import (
@@ -29,22 +29,33 @@ def _as_number(value: Any) -> float:
 class ModelManager:
     _live_analysis_lock = Lock()
 
-    def execute(self, *, model_id: str, query: str, request: dict[str, Any]) -> NormalizedResult:
+    def execute(self, *, model_id: str, query: str, request: dict[str, Any], aoi: Optional[AOIInfo] = None) -> NormalizedResult:
         if not self._live_analysis_lock.acquire(blocking=False):
             raise ImageryError("Another live satellite analysis is already running; please retry shortly")
         try:
-            return self._execute(model_id=model_id, query=query, request=request)
+            return self._execute(model_id=model_id, query=query, request=request, aoi=aoi)
         finally:
             gc.collect()
             self._live_analysis_lock.release()
 
-    def _execute(self, *, model_id: str, query: str, request: dict[str, Any]) -> NormalizedResult:
+    def _execute(self, *, model_id: str, query: str, request: dict[str, Any], aoi: Optional[AOIInfo] = None) -> NormalizedResult:
         model_key = (model_id or "").lower().replace("_", "-")
-        if model_key not in MODEL_REGISTRY:
-            model_key = "prithvi-eo-2.0"
+        if model_key not in ["deterministic-spectral-analysis", "prithvi-eo-2.0", "sentinel-2-ndvi", "ndvi"]:
+            raise ModelNotImplementedError(
+                f"{model_id} is registered but has no hosted local inference implementation; "
+                "only deterministic Sentinel-2 spectral analysis is currently available locally"
+            )
 
-        aoi_name = (request.get("aoi") or {}).get("name") or query
-        aoi = resolve_aoi(aoi_name)
+        if aoi is None:
+            resolved_aoi_dict = request.get("resolved_aoi")
+            if resolved_aoi_dict:
+                aoi = AOIInfo.model_validate(resolved_aoi_dict) if isinstance(resolved_aoi_dict, dict) else resolved_aoi_dict
+            else:
+                req_aoi = request.get("aoi") or {}
+                aoi_name = req_aoi.get("name")
+                if not aoi_name or aoi_name.strip().casefold() == query.strip().casefold():
+                    raise AOIResolutionError("Geographic location is required for satellite analysis. Please specify a recognized place or administrative boundary.")
+                aoi = resolve_aoi(aoi_name)
         intent = request.get("intent") or {}
         temporal = intent.get("temporal_scope") or {}
         output_dir = Path(__file__).resolve().parents[2] / settings.IMAGE_OUTPUT_DIR
@@ -72,11 +83,18 @@ class ModelManager:
             MetricItem(label="Vegetation gain", value=f"{gain:.4f}" if gain is not None else "unavailable", unit="%"),
         ]
         output_root = output_dir
-        before_url = f"/generated-images/{before.true_color_path.relative_to(output_root).as_posix()}"
-        after_url = f"/generated-images/{after.true_color_path.relative_to(output_root).as_posix()}"
-        dataset_ids = (request.get("data_requirements") or {}).get("datasets") or ["sentinel-2"]
-        model_meta = MODEL_REGISTRY.get(model_key, {})
-        model_display_name = model_meta.get("name", model_id)
+        try:
+            rel_before = before.true_color_path.relative_to(output_root).as_posix()
+        except ValueError:
+            rel_before = before.true_color_path.name
+        try:
+            rel_after = after.true_color_path.relative_to(output_root).as_posix()
+        except ValueError:
+            rel_after = after.true_color_path.name
+        before_url = f"/generated-images/{rel_before}"
+        after_url = f"/generated-images/{rel_after}"
+        dataset_ids = ["Sentinel-2 L2A"]
+        model_display_name = "Deterministic Spectral Analysis"
         return NormalizedResult(
             query=query,
             analysis_type=(request.get("analysis") or {}).get("operation", "temporal_change"),
@@ -84,14 +102,21 @@ class ModelManager:
             aoi_bbox=aoi.bbox,
             location={"name": aoi.name, "latitude": aoi.center.latitude, "longitude": aoi.center.longitude},
             provenance=Provenance(
-                source="planetary_computer", fallback=False, model_id=model_key,
-                model_name=model_display_name, dataset_ids=dataset_ids,
-                acquisition_dates=f"{before.date} to {after.date}", pipeline="Nominatim / Planetary Computer / rasterio",
+                source="live",
+                fallback=False,
+                model_id="deterministic-spectral-analysis",
+                model_name=model_display_name,
+                algorithm="NDVI = (B08 - B04) / (B08 + B04)",
+                dataset_ids=dataset_ids,
+                acquisition_dates=f"{before.date} to {after.date}",
+                pipeline="Nominatim / Planetary Computer / rasterio",
+                notes="Deterministic spectral index computed directly from surface reflectance bands without foundation model inference.",
             ),
             key_finding=f"Sentinel-2 NDVI changed by {change_text} across {metrics['changed_area_km2']:.4f} km² between {before.date} and {after.date}.",
             scientific_explanation=(
-                f"Pixel-level NDVI was computed from Sentinel-2 B08 and B04 reflectance for {aoi.name}. "
-                f"Pixels with absolute NDVI change at least {metrics['change_threshold']:.2f} were counted at 10 m resolution."
+                f"Observed: Sentinel-2 mean NDVI changed by {change_text} across {metrics['changed_area_km2']:.4f} km² between {before.date} and {after.date} in {aoi.name}.\n\n"
+                "Possible explanations: Such reductions or increases may correspond to seasonal phenological cycles, agricultural cultivation patterns, or land cover transitions.\n\n"
+                "Not established: Satellite spectral index alone does not establish causation without ground validation or higher-resolution land classification."
             ),
             metrics=metrics_items,
             image_comparison=SatelliteImagePair(
@@ -115,6 +140,7 @@ class ModelManager:
             confidence=None, confidence_level=None,
             audit_trace=_build_audit_trace(model_display_name, dataset_ids),
         )
+
 
 
 model_manager = ModelManager()

@@ -745,7 +745,7 @@
      SEARCH
      ===================================================== */
 
-  .search-icon {
+  :global(.search-icon) {
 
     flex-shrink: 0;
 

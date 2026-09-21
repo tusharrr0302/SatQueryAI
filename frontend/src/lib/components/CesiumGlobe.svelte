@@ -1,6 +1,6 @@
 <script lang="ts">
   import { onMount, onDestroy } from 'svelte';
-  import { globeLocation, layersState, currentResult, activeDataLayers, currentGlobeSkin, flyToLayerTrigger } from '../stores';
+  import { globeLocation, layersState, currentResult, activeDataLayers, currentGlobeSkin, flyToLayerTrigger, type DataLayerSpec } from '../stores';
   import { Plus, Minus, Crosshair, Edit3 } from 'lucide-svelte';
   import * as Cesium from 'cesium';
   import 'cesium/Build/Cesium/Widgets/widgets.css';
@@ -16,7 +16,7 @@
 
   let markerEntity: Cesium.Entity | null = null;
   let polygonEntity: Cesium.Entity | null = null;
-  let satelliteLayer: Cesium.ImageryLayer | null = null;
+  let satelliteLayer: any = null;
 
   let spatialOverlayEntities: Cesium.Entity[] = [];
   let changeOverlayEntity: Cesium.Entity | null = null;
@@ -2084,7 +2084,7 @@
   }
 
 
-  .aoi-icon {
+  :global(.aoi-icon) {
 
     color:
       var(--accent-emerald);

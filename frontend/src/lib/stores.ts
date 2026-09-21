@@ -56,6 +56,7 @@ export interface VisualizationSpec {
   reverse_depth?: boolean;
   surface_grid?: number[][];
   timeseries?: TimeSeriesPoint[];
+  data?: any[];
 }
 
 export interface AuditTraceStage {
@@ -76,6 +77,65 @@ export interface Provenance {
   dataset_ids: string[];
   acquisition_dates?: string;
   pipeline: string;
+  discovery_provider?: string;
+  processing_provider?: string;
+  execution_status?: string;
+  fallback_reason?: string;
+}
+
+export interface EvidenceItem {
+  id: string;
+  type: string;
+  title: string;
+  description?: string;
+  sensor: string;
+  dataset_id: string;
+  processing_level?: string;
+  acquisition_date: string;
+  aoi_name?: string;
+  bbox: number[];
+  rendering: string;
+  image_url?: string | null;
+  resolution_m: number;
+  cloud_cover?: number;
+  coverage_type?: string;
+  source: string;
+  cesium_layer_id?: string;
+  role?: string;
+  baseline_role?: string;
+  available?: boolean;
+  status?: string;
+  message?: string;
+  error_message?: string;
+  surface_grid?: number[][];
+  metadata?: Record<string, any>;
+}
+
+export interface MethodInfo {
+  data: string[];
+  model: string;
+  discovery_provider: string;
+  processing_provider: string;
+  source: string;
+}
+
+export interface PresentationPlan {
+  id: string;
+  title: string;
+  summary?: string;
+  evidence_items: EvidenceItem[];
+  primary_evidence_id?: string;
+  baseline_evidence_id?: string;
+  has_baseline: boolean;
+  baseline_missing_reason?: string;
+  baseline_role?: string;
+  baseline_title?: string;
+  baseline_note?: string;
+  coverage_type?: string;
+  change_analysis?: string;
+  method: MethodInfo;
+  limitations: string[];
+  key_measurements: any[];
 }
 
 export interface BackendVisualization {
@@ -91,6 +151,8 @@ export interface BackendVisualization {
   renderer?: string;
   unit?: string;
   source_field?: string;
+  surface_grid?: number[][];
+  explanation?: any;
   layer?: {
     layer_type?: string;
     name?: string;
@@ -163,6 +225,10 @@ export interface LayerProvenance {
   dataset_id?: string;
   model_id?: string;
   source: string;
+  dataset_name?: string;
+  model_name?: string;
+  date?: string;
+  resolution?: string;
 }
 
 export interface LayerAccess {
@@ -176,6 +242,12 @@ export interface DataLayerSpec {
   type: string;
   title: string;
   description: string;
+  role?: "study_area" | "primary_analysis" | "comparison" | "reference" | "boundary" | "context" | "evidence";
+  purpose?: string;
+  dataset?: string;
+  model?: string;
+  date?: string;
+  resolution?: string;
   source: LayerSource;
   spatial: LayerSpatial;
   style: LayerStyle;
@@ -184,6 +256,85 @@ export interface DataLayerSpec {
   provenance: LayerProvenance;
   access: LayerAccess;
   visible?: boolean;
+}
+
+export interface TemporalObservationItem {
+  slot_id: string;
+  year?: number;
+  period_label: string;
+  target_date: string;
+  status: "ready" | "unavailable" | "low_confidence";
+  reason?: string;
+  dataset_id?: string;
+  asset_id?: string;
+  cloud_cover?: number;
+  ndvi_mean?: number;
+  image_url?: string;
+}
+
+export interface VisualizationExplanation {
+  // 7 Canonical Factual Fields (Part 8)
+  title?: string;
+  what_it_shows?: string;
+  data_source?: string;
+  variables?: string[];
+  how_to_read?: string;
+  why_it_matters?: string;
+  limitations?: string;
+
+  // Extended facets
+  visual_form?: string;
+  what_this_represents?: string;
+  primary_metric?: string;
+  baseline_comparison?: string;
+  palette_and_scale?: string;
+  critical_thresholds?: string;
+  spatial_context?: string;
+  provenance_and_sensor?: string;
+  visual_inferences?: string;
+  plain_language_summary?: string;
+  technical_summary?: string;
+  what_you_see?: string;
+  why_chosen?: string;
+  key_observation?: string;
+  units?: string;
+  temporal_range?: string;
+  dataset?: string;
+  model?: string;
+}
+
+
+export interface VisualizationPlan {
+  primary_visualization: BackendVisualization;
+  secondary_visualizations?: BackendVisualization[];
+  active_layers?: DataLayerSpec[];
+  layers?: DataLayerSpec[];
+  camera?: {
+    action?: string;
+    destination?: number[];
+    name?: string;
+    bbox?: number[];
+    altitude?: number;
+    pitch?: number;
+    heading?: number;
+    roll?: number;
+  };
+  legend?: any;
+  explanation?: VisualizationExplanation;
+}
+
+export interface WebEvidenceItem {
+  id?: string;
+  title: string;
+  snippet: string;
+  source: string;
+  source_domain?: string;
+  attribution?: string;
+  url?: string;
+  published_date?: string;
+  image_url?: string;
+  thumbnail_url?: string;
+  is_reference_photo?: boolean;
 }
 
 export interface NormalizedResult {
@@ -203,6 +354,9 @@ export interface NormalizedResult {
   image_comparison?: SatelliteImagePair;
   visualization?: VisualizationSpec;
   visualizations?: BackendVisualization[];
+  visualization_plan?: VisualizationPlan;
+  web_evidence?: WebEvidenceItem[];
+  ai_mode?: string;
   layers?: DataLayerSpec[];
   time_series: TimeSeriesPoint[];
   before_image_url?: string;
@@ -212,7 +366,15 @@ export interface NormalizedResult {
   confidence_level?: string | null;
   audit_trace: AuditTraceStage[];
   suggested_questions: string[];
+  presentation_plan?: PresentationPlan;
+  evidence_items?: EvidenceItem[];
   created_at: string;
+  is_conversational?: boolean;
+  question_type?: string;
+  conversational_mode?: string;
+  visualization_required?: boolean;
+  visualization_reason?: string;
+  visualization_type?: string;
 }
 
 export interface ChatMessage {
@@ -221,7 +383,28 @@ export interface ChatMessage {
   content: string;
   timestamp: string;
   result?: NormalizedResult;
+  model?: string;
+  datasets?: string[];
+  visualizations?: any[];
+  visualization_plan?: VisualizationPlan;
+  web_evidence?: WebEvidenceItem[];
+  ai_mode?: string;
+  layers?: any[];
+  globe_actions?: any[];
+  source?: string;
+  status?: string;
+  is_conversational?: boolean;
+  question_type?: string;
+  conversational_mode?: string;
+  visualization_required?: boolean;
+  visualization_reason?: string;
+  visualization_type?: string;
 }
+
+// AI Mode & Visualization Planning stores
+export type AIMode = "auto" | "beginner" | "intermediate" | "advanced";
+export const aiMode = writable<AIMode>("auto");
+export const activeVisualizationPlan = writable<VisualizationPlan | null>(null);
 
 // Navigation & views
 export type ViewState = "landing" | "processing" | "analysis";
@@ -263,11 +446,11 @@ export interface AnalysisStepInfo {
 }
 
 export const liveAnalysisSteps = writable<AnalysisStepInfo[]>([
-  { step: 'understanding', label: 'Understanding query with GPT-OSS', status: 'pending' },
-  { step: 'aoi', label: 'Resolving AOI & geospatial bounds', status: 'pending' },
-  { step: 'imagery', label: 'Selecting Earth Observation imagery', status: 'pending' },
-  { step: 'analysis', label: 'Executing geospatial analysis model', status: 'pending' },
-  { step: 'visualization', label: 'Preparing map layers & visualizations', status: 'pending' },
+  { step: 'understanding', label: 'Understanding location', status: 'pending' },
+  { step: 'datasets', label: 'Finding EO datasets', status: 'pending' },
+  { step: 'layers', label: 'Selecting layers', status: 'pending' },
+  { step: 'analysis', label: 'Running analysis', status: 'pending' },
+  { step: 'earth_view', label: 'Building Earth view', status: 'pending' },
 ]);
 export const liveAnalysisStatus = writable<string>('Analyzing Earth...');
 
@@ -402,12 +585,15 @@ export const layersState = writable<LayerConfig[]>([
 export const timelineState = writable<{
   activeYear: string;
   years: string[];
+  observations: TemporalObservationItem[];
   isPlaying: boolean;
 }>({
   activeYear: "2024",
   years: ["2016", "2018", "2020", "2022", "2024", "2026"],
+  observations: [],
   isPlaying: false,
 });
+
 
 // Settings
 export const userSettings = writable<{

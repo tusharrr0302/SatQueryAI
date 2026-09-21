@@ -149,6 +149,7 @@
                 class="asset-item-card"
                 class:active={$activeAsset?.asset_id === asset.asset_id}
                 on:click={() => handleSelect(asset)}
+                on:keydown={(e) => (e.key === 'Enter' || e.key === ' ') && handleSelect(asset)}
                 role="button"
                 tabindex="0"
               >
@@ -204,6 +205,10 @@
               <div class="spec-box">
                 <span class="spec-lbl">BANDS</span>
                 <span class="spec-val">{p.dimensions.bands} bands</span>
+              </div>
+              <div class="spec-box">
+                <span class="spec-lbl">RASTER SIZE</span>
+                <span class="spec-val">{p.dimensions.width && p.dimensions.height ? `${p.dimensions.width}×${p.dimensions.height}` : 'Variable'}</span>
               </div>
               <div class="spec-box">
                 <span class="spec-lbl">RESOLUTION</span>

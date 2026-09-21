@@ -44,9 +44,11 @@ class ConnectionManager:
         data: dict,
         user_id: Optional[str] = None,
         conversation_id: Optional[str] = None,
+        request_id: Optional[str] = None,
     ):
         """
         Delivers real-time execution events strictly to authenticated user's sockets.
+        Scoped by user_id, conversation_id, and request_id.
         """
         if not user_id or user_id not in self.user_connections:
             return
@@ -54,6 +56,8 @@ class ConnectionManager:
         payload_dict = {"event": event_type, "data": data}
         if conversation_id:
             payload_dict["conversation_id"] = conversation_id
+        if request_id:
+            payload_dict["request_id"] = request_id
         payload = json.dumps(payload_dict)
 
         targets: Set[WebSocket] = set(self.user_connections[user_id])

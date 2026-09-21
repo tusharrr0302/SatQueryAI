@@ -19,16 +19,14 @@
 {#if $showSettingsModal}
   <div
     class="modal-backdrop"
-    on:click={closeModal}
-    role="button"
-    tabindex="0"
+    on:click={(e) => { if (e.target === e.currentTarget) closeModal(); }}
+    on:keydown={(e) => { if (e.key === 'Escape') closeModal(); }}
+    role="dialog"
+    aria-modal="true"
+    tabindex="-1"
+    aria-label="Settings Modal"
   >
-    <div
-      class="modal-card"
-      on:click|stopPropagation
-      role="region"
-      tabindex="-1"
-    >
+    <div class="modal-card">
 
       <!-- =====================================================
            HEADER

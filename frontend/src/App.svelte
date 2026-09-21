@@ -19,6 +19,9 @@
     authModalMode,
     liveAnalysisSteps,
     liveAnalysisStatus,
+    aiMode,
+    activeVisualizationPlan,
+    timelineState,
     type ChatMessage,
     type DataLayerSpec,
   } from './lib/stores';
@@ -102,6 +105,8 @@
     }
   }
 
+  let activeRequestId = '';
+
   async function connectUserWebSocket() {
     if (isConnectingWs) return;
     isConnectingWs = true;
@@ -109,43 +114,46 @@
     try {
       const sock = await initWebSocket((event, data) => {
         console.log('[App WS Event]', event, data);
+        // Filter events by active conversation and request if present
+        if (data?.conversation_id && $conversationId && data.conversation_id !== $conversationId) return;
+        if (data?.request_id && activeRequestId && data.request_id !== activeRequestId) return;
+
         if (event === 'planning') {
-          liveAnalysisStatus.set('Understanding request with GPT-OSS...');
+          liveAnalysisStatus.set('Understanding location & intent...');
           liveAnalysisSteps.set([
-            { step: 'understanding', label: 'Understanding query with GPT-OSS', status: 'running' },
-            { step: 'aoi', label: 'Resolving AOI & geospatial bounds', status: 'pending' },
-            { step: 'imagery', label: 'Selecting Earth Observation imagery', status: 'pending' },
-            { step: 'analysis', label: 'Executing geospatial analysis model', status: 'pending' },
-            { step: 'visualization', label: 'Preparing map layers & visualizations', status: 'pending' },
+            { step: 'understanding', label: 'Understanding location', status: 'running' },
+            { step: 'datasets', label: 'Finding EO datasets', status: 'pending' },
+            { step: 'layers', label: 'Selecting layers', status: 'pending' },
+            { step: 'analysis', label: 'Running analysis', status: 'pending' },
+            { step: 'earth_view', label: 'Building Earth view', status: 'pending' },
           ]);
         } else if (event === 'aoi_resolving') {
-          liveAnalysisStatus.set(data?.name ? `Resolving AOI: ${data.name}` : 'Resolving target AOI...');
+          liveAnalysisStatus.set(data?.name ? `Resolving location: ${data.name}` : 'Understanding target location...');
           liveAnalysisSteps.update((steps) => steps.map((s) => {
-            if (s.step === 'understanding') return { ...s, status: 'completed' };
-            if (s.step === 'aoi') return { ...s, status: 'running' };
+            if (s.step === 'understanding') return { ...s, status: 'running' };
             return s;
           }));
           if (data?.name) {
             globeLocation.update((g) => ({ ...g, name: `Resolving ${data.name}...` }));
           }
         } else if (event === 'scenario_matched' || event === 'gpt_started') {
-          liveAnalysisStatus.set('Matching Earth observation pipeline...');
+          liveAnalysisStatus.set('Finding EO datasets & STAC collections...');
           liveAnalysisSteps.update((steps) => steps.map((s) => {
-            if (s.step === 'understanding' || s.step === 'aoi') return { ...s, status: 'completed' };
-            if (s.step === 'imagery') return { ...s, status: 'running' };
+            if (s.step === 'understanding') return { ...s, status: 'completed' };
+            if (s.step === 'datasets') return { ...s, status: 'running' };
             return s;
           }));
         } else if (event === 'imagery_started') {
-          liveAnalysisStatus.set('Retrieving satellite imagery...');
+          liveAnalysisStatus.set('Selecting primary and context layers...');
           liveAnalysisSteps.update((steps) => steps.map((s) => {
-            if (s.step === 'understanding' || s.step === 'aoi') return { ...s, status: 'completed' };
-            if (s.step === 'imagery') return { ...s, status: 'running' };
+            if (s.step === 'understanding' || s.step === 'datasets') return { ...s, status: 'completed' };
+            if (s.step === 'layers') return { ...s, status: 'running' };
             return s;
           }));
         } else if (event === 'analysis_started' || event === 'tool_started') {
-          liveAnalysisStatus.set('Executing remote sensing analysis model...');
+          liveAnalysisStatus.set('Running remote sensing analysis...');
           liveAnalysisSteps.update((steps) => steps.map((s) => {
-            if (s.step === 'understanding' || s.step === 'aoi' || s.step === 'imagery') return { ...s, status: 'completed' };
+            if (s.step === 'understanding' || s.step === 'datasets' || s.step === 'layers') return { ...s, status: 'completed' };
             if (s.step === 'analysis') return { ...s, status: 'running' };
             return s;
           }));
@@ -160,9 +168,9 @@
             }));
           }
         } else if (event === 'visualization_created') {
-          liveAnalysisStatus.set('Generating geospatial layers...');
+          liveAnalysisStatus.set('Building Earth view & 3D layers...');
           liveAnalysisSteps.update((steps) => steps.map((s) => {
-            if (s.step !== 'visualization') return { ...s, status: 'completed' };
+            if (s.step !== 'earth_view') return { ...s, status: 'completed' };
             return { ...s, status: 'running' };
           }));
         } else if (event === 'completed') {
@@ -198,6 +206,40 @@
      CORE UNIFIED CHAT EXECUTION (MULTI-TURN PERSISTENT)
      ========================================================= */
 
+  function appendChatResponse(res: any, tempId?: string) {
+    if (!res || !res.assistant_message) return;
+    const assistantMsg = {
+      ...res.assistant_message,
+      visualization_plan: res.visualization_plan || res.assistant_message.visualization_plan,
+      web_evidence: res.web_evidence || res.assistant_message.web_evidence,
+      ai_mode: res.ai_mode || res.assistant_message.ai_mode,
+      layers: res.layers || res.assistant_message.layers,
+      visualizations: res.visualizations || res.assistant_message.visualizations,
+      conversational_mode: res.conversational_mode || res.assistant_message.conversational_mode,
+      visualization_required: res.visualization_required !== undefined ? res.visualization_required : res.assistant_message.visualization_required,
+      visualization_reason: res.visualization_reason || res.assistant_message.visualization_reason,
+      visualization_type: res.visualization_type || res.assistant_message.visualization_type,
+    };
+    messages.update((existing) => {
+      const withoutTemp = tempId ? existing.filter((m) => m.id !== tempId) : existing;
+      const userMsg = res.user_message || {
+        id: `user_${Date.now()}`,
+        role: 'user',
+        content: submittedQuery,
+        timestamp: new Date().toISOString(),
+      };
+      return [...withoutTemp, userMsg, assistantMsg];
+    });
+
+    if (res.conversation_id) {
+      $conversationId = res.conversation_id;
+      localStorage.setItem('sq_conv_id', res.conversation_id);
+    }
+    if (res.visualization_plan) {
+      $activeVisualizationPlan = res.visualization_plan;
+    }
+  }
+
   async function executeChatQuery(query: string) {
     if (!$isSignedIn) {
       pendingQuery = query;
@@ -226,69 +268,100 @@
     };
     $messages = [...$messages, tempUserMsg];
 
+    activeRequestId = `req_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
+
     // Initialize in-chat live analysis indicator
     liveAnalysisStatus.set('Analyzing Earth...');
     liveAnalysisSteps.set([
-      { step: 'understanding', label: 'Understanding query with GPT-OSS', status: 'running' },
-      { step: 'aoi', label: 'Resolving AOI & geospatial bounds', status: 'pending' },
-      { step: 'imagery', label: 'Selecting Earth Observation imagery', status: 'pending' },
-      { step: 'analysis', label: 'Executing geospatial analysis model', status: 'pending' },
-      { step: 'visualization', label: 'Preparing map layers & visualizations', status: 'pending' },
+      { step: 'understanding', label: 'Understanding location', status: 'running' },
+      { step: 'datasets', label: 'Finding EO datasets', status: 'pending' },
+      { step: 'layers', label: 'Selecting layers', status: 'pending' },
+      { step: 'analysis', label: 'Running analysis', status: 'pending' },
+      { step: 'earth_view', label: 'Building Earth view', status: 'pending' },
     ]);
 
     try {
-      const res = await sendChatQuery(query, $conversationId, $activeAsset?.asset_id);
+      const res = await sendChatQuery(query, $conversationId, $activeAsset?.asset_id, activeRequestId, $aiMode);
 
-      if (res.result) {
-        $currentResult = res.result;
+      if (res && res.assistant_message) {
+        appendChatResponse(res, tempId);
 
-        // Replace provisional message with canonical user_message and append assistant_message
-        const withoutTemp = $messages.filter((m) => m.id !== tempId);
-        $messages = [...withoutTemp, res.user_message, res.assistant_message];
+        if (res.result || res.normalized_result) {
+          const nextRes = res.normalized_result || res.result;
+          if (!res.is_conversational && !nextRes?.is_conversational) {
+            $currentResult = nextRes;
+          }
 
-        $conversationId = res.conversation_id;
-        localStorage.setItem('sq_conv_id', res.conversation_id);
+          // Set or update activeDataLayers
+          const incomingLayers: DataLayerSpec[] = res.layers || res.result?.layers || [];
+          if (incomingLayers.length > 0) {
+            if (!res.is_conversational && !nextRes?.is_conversational) {
+              // Fresh analysis: replace previous layers so prior query artifacts do not leak
+              activeDataLayers.set(incomingLayers);
+            } else {
+              activeDataLayers.update((existing) => {
+                const map = new Map<string, DataLayerSpec>();
+                for (const l of existing || []) map.set(l.layer_id, l);
+                for (const l of incomingLayers) map.set(l.layer_id, l);
+                return Array.from(map.values());
+              });
+            }
+          }
 
-        // Merge incoming layers into activeDataLayers (accumulate across multi-turn queries)
-        const incomingLayers: DataLayerSpec[] = res.layers || res.result.layers || [];
-        if (incomingLayers.length > 0) {
-          activeDataLayers.update((existing) => {
-            const map = new Map<string, DataLayerSpec>();
-            for (const l of existing || []) map.set(l.layer_id, l);
-            for (const l of incomingLayers) map.set(l.layer_id, l);
-            return Array.from(map.values());
-          });
-        }
+          // Update camera / globe location
+          const flyAction = res.globe_action || (res.globe_actions && res.globe_actions.length ? res.globe_actions[0] : null);
+          if (flyAction && flyAction.latitude !== undefined && flyAction.longitude !== undefined) {
+            globeLocation.update((g) => ({
+              ...g,
+              latitude: flyAction.latitude,
+              longitude: flyAction.longitude,
+              name: flyAction.name || g.name,
+              area_km2: flyAction.area_km2 || g.area_km2,
+              polygon: flyAction.polygon || g.polygon,
+              flyTrigger: g.flyTrigger + 1,
+            }));
+          } else if (res.result?.aoi?.center) {
+            globeLocation.update((g) => ({
+              ...g,
+              latitude: res.result.aoi.center.latitude,
+              longitude: res.result.aoi.center.longitude,
+              name: res.result.aoi.name || g.name,
+              area_km2: res.result.aoi.area_km2 || g.area_km2,
+              polygon: res.result.aoi.polygon || g.polygon,
+              flyTrigger: g.flyTrigger + 1,
+            }));
+          }
 
-        // Update camera / globe location
-        if (res.globe_action) {
-          globeLocation.update((g) => ({
-            ...g,
-            latitude: res.globe_action.latitude,
-            longitude: res.globe_action.longitude,
-            name: res.globe_action.name || g.name,
-            area_km2: res.globe_action.area_km2 || g.area_km2,
-            polygon: res.globe_action.polygon || g.polygon,
-            flyTrigger: g.flyTrigger + 1,
-          }));
-        } else if (res.result.aoi?.center) {
-          globeLocation.update((g) => ({
-            ...g,
-            latitude: res.result.aoi.center.latitude,
-            longitude: res.result.aoi.center.longitude,
-            name: res.result.aoi.name || g.name,
-            area_km2: res.result.aoi.area_km2 || g.area_km2,
-            polygon: res.result.aoi.polygon || g.polygon,
-            flyTrigger: g.flyTrigger + 1,
-          }));
-        }
+          // Update timeline observations if present
+          const temporalObs = res.data_discovery_result?.temporal_observations || nextRes?.temporal_observations || [];
+          if (temporalObs.length > 0) {
+            const years = temporalObs.map((o: any) => String(o.year || o.period_label)).filter(Boolean);
+            timelineState.update((t) => ({
+              ...t,
+              observations: temporalObs,
+              years: years.length > 0 ? years : t.years,
+              activeYear: years[years.length - 1] || t.activeYear,
+            }));
+          } else if (nextRes?.time_series && nextRes.time_series.length > 0) {
+            const years: string[] = nextRes.time_series.map((pt: any) => String(pt.date).slice(0, 4)).filter(Boolean);
+            const uniqueYears: string[] = Array.from(new Set<string>(years));
+            if (uniqueYears.length > 0) {
+              timelineState.update((t) => ({
+                ...t,
+                years: uniqueYears,
+                activeYear: uniqueYears[uniqueYears.length - 1] || t.activeYear,
+              }));
+            }
+          }
 
-        // Automatic fly to layer bounds
-        if (incomingLayers.length > 0) {
-          const targetLayer = incomingLayers[0];
-          setTimeout(() => {
-            $flyToLayerTrigger = { layerId: targetLayer.layer_id, timestamp: Date.now() };
-          }, 350);
+          // Automatic fly to layer bounds
+          if (incomingLayers.length > 0) {
+            const targetLayer = incomingLayers[0];
+            setTimeout(() => {
+              $flyToLayerTrigger = { layerId: targetLayer.layer_id, timestamp: Date.now() };
+            }, 350);
+          }
+
         }
       }
     } catch (err) {
@@ -305,10 +378,13 @@
         ...tempUserMsg,
         id: `msg_${Date.now()}_u`,
       };
-      const withoutTemp = $messages.filter((m) => m.id !== tempId);
-      $messages = [...withoutTemp, finalUserMsg, errorMsg];
+      messages.update((existing) => {
+        const withoutTemp = existing.filter((m) => m.id !== tempId);
+        return [...withoutTemp, finalUserMsg, errorMsg];
+      });
     } finally {
       $isAnalyzing = false;
+      activeRequestId = '';
     }
   }
 
@@ -575,59 +651,7 @@
     border: none;
   }
 
-  .globe-tile-box.is-hidden {
-    display: none !important;
-  }
 
-  /* Visualization Renderer Switcher */
-  .renderer-selector-bar {
-    display: flex;
-    gap: 4px;
-    padding: 3px;
-    background: rgba(255, 255, 255, 0.04);
-    border: 1px solid rgba(255, 255, 255, 0.08);
-    border-radius: 8px;
-    flex-shrink: 0;
-  }
-
-  .renderer-tab-btn {
-    flex: 1;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: 6px;
-    padding: 6px 8px;
-    border-radius: 6px;
-    background: transparent;
-    border: none;
-    color: rgba(255, 255, 255, 0.5);
-    font-size: 10px;
-    font-weight: 500;
-    cursor: pointer;
-    transition: all 0.15s ease;
-    white-space: nowrap;
-  }
-
-  .renderer-tab-btn:hover {
-    color: #fff;
-    background: rgba(255, 255, 255, 0.05);
-  }
-
-  .renderer-tab-btn.active {
-    background: rgba(255, 255, 255, 0.12);
-    color: #fff;
-    font-weight: 600;
-  }
-
-  .raster-tile-box {
-    flex: 1;
-    width: 100%;
-    min-height: 260px;
-    border-radius: 12px;
-    overflow: hidden;
-    position: relative;
-    border: 1px solid rgba(255, 255, 255, 0.08);
-  }
 
   .data-workspace-canvas {
     width: 100%;
@@ -726,28 +750,6 @@
     border-color: rgba(255, 255, 255, 0.2);
   }
 
-  .scientific-tile-box {
-    flex: 1.1;
-    min-height: 220px;
-    border-radius: 12px;
-    overflow: hidden;
-    background: #080c14;
-    border: 1px solid rgba(255, 255, 255, 0.08);
-    animation: slideUp 0.4s cubic-bezier(0.16, 1, 0.3, 1);
-  }
-
-
-  @keyframes slideUp {
-    from {
-      opacity: 0;
-      transform: translateY(14px);
-    }
-    to {
-      opacity: 1;
-      transform: translateY(0);
-    }
-  }
-
   .right-chat-column {
     flex: 1;
     height: 100%;
@@ -762,162 +764,6 @@
     }
     to {
       opacity: 1;
-    }
-  }
-
-  /* =========================================================
-     AUTH GATE & LOADING SCREEN STYLES
-     ========================================================= */
-
-  .auth-gate-loading {
-    width: 100vw;
-    height: 100vh;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    background: radial-gradient(circle at 50% 30%, rgba(255, 255, 255, 0.03) 0%, #030303 60%, #000000 100%);
-  }
-
-  .gate-loading-card {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    text-align: center;
-    padding: 36px 48px;
-    background: rgba(10, 10, 10, 0.7);
-    border: 1px solid rgba(255, 255, 255, 0.08);
-    border-radius: 16px;
-    backdrop-filter: blur(16px);
-    box-shadow: 0 30px 60px rgba(0, 0, 0, 0.7);
-  }
-
-  .gate-loading-logo {
-    width: 48px;
-    height: 48px;
-    object-fit: contain;
-    margin-bottom: 20px;
-    filter: drop-shadow(0 0 16px rgba(255, 255, 255, 0.15));
-  }
-
-  .gate-spinner-ring {
-    width: 26px;
-    height: 26px;
-    border: 2px solid rgba(255, 255, 255, 0.1);
-    border-top-color: #ffffff;
-    border-radius: 50%;
-    animation: spin 0.8s linear infinite;
-    margin-bottom: 16px;
-  }
-
-  .gate-loading-title {
-    font-size: 15px;
-    font-weight: 600;
-    color: #f5f5f5;
-    letter-spacing: -0.01em;
-    margin-bottom: 6px;
-  }
-
-  .gate-loading-subtitle {
-    font-size: 12px;
-    color: rgba(255, 255, 255, 0.45);
-  }
-
-  .auth-gate-screen {
-    width: 100vw;
-    min-height: 100vh;
-    display: flex;
-    align-items: flex-start;
-    justify-content: center;
-    background: radial-gradient(circle at 50% 15%, rgba(255, 255, 255, 0.04) 0%, #040404 65%, #000000 100%);
-    padding: 48px 20px 64px 20px;
-    box-sizing: border-box;
-    overflow-y: auto;
-  }
-
-  .auth-gate-container {
-    width: 100%;
-    max-width: 520px;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: 20px;
-    animation: fadeIn 0.3s ease-out;
-  }
-
-  .auth-gate-branding {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    text-align: center;
-  }
-
-  .gate-brand-logo {
-    width: 54px;
-    height: 54px;
-    object-fit: contain;
-    margin-bottom: 14px;
-    filter: drop-shadow(0 0 20px rgba(255, 255, 255, 0.18));
-  }
-
-  .gate-badge {
-    display: inline-flex;
-    align-items: center;
-    gap: 6px;
-    padding: 4px 12px;
-    border-radius: 9999px;
-    background: rgba(255, 255, 255, 0.05);
-    border: 1px solid rgba(255, 255, 255, 0.15);
-    color: #ffffff;
-    font-size: 11px;
-    font-weight: 600;
-    letter-spacing: 0.06em;
-    margin-bottom: 12px;
-    text-transform: uppercase;
-  }
-
-  .gate-title {
-    font-size: 24px;
-    font-weight: 700;
-    color: #ffffff;
-    letter-spacing: -0.03em;
-    margin: 0 0 8px 0;
-  }
-
-  .gate-description {
-    font-size: 13px;
-    line-height: 1.55;
-    color: rgba(255, 255, 255, 0.58);
-    margin: 0;
-    max-width: 440px;
-  }
-
-  .auth-gate-card-box {
-    width: 100%;
-    display: flex;
-    justify-content: center;
-  }
-
-  .auth-gate-footer {
-    display: flex;
-    align-items: center;
-    gap: 7px;
-    font-size: 11px;
-    color: rgba(255, 255, 255, 0.4);
-    text-align: center;
-  }
-
-  .pulse {
-    animation: pulseGlow 2.5s ease-in-out infinite;
-  }
-
-  @keyframes pulseGlow {
-    0%, 100% {
-      opacity: 0.8;
-      transform: scale(1);
-    }
-    50% {
-      opacity: 1;
-      transform: scale(1.05);
     }
   }
 </style>

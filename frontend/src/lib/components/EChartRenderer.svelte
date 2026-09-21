@@ -72,14 +72,14 @@
       } else if (Array.isArray(data) && data.length > 0 && typeof data[0] === 'object' && 'x' in data[0]) {
         data.forEach((d: any) => surfaceData.push([d.x, d.y, d.z ?? d.value]));
       } else {
-        const rows = 16;
-        const cols = 16;
-        for (let r = 0; r < rows; r++) {
-          for (let c = 0; c < cols; c++) {
-            const val = 0.35 + (r * 0.02) - (c * 0.015) + (Math.sin(r * 0.6) * 0.22) + (Math.cos(c * 0.6) * 0.18);
-            surfaceData.push([c, r, Math.round(Math.max(-0.2, Math.min(0.8, val)) * 100) / 100]);
-          }
-        }
+        // Strict scientific integrity: do not fabricate synthetic surface math
+        chart.clear();
+        return;
+      }
+
+      if (!surfaceData.length) {
+        chart.clear();
+        return;
       }
 
       const gradientColors = ['#111827', '#374151', '#6b7280', '#9ca3af', '#e5e7eb', '#f8fafc'];

@@ -194,7 +194,14 @@
           </button>
 
           {#if isUserMenuOpen}
-            <div class="user-dropdown-backdrop" on:click={closeUserMenu}></div>
+            <div
+              class="user-dropdown-backdrop"
+              on:click={closeUserMenu}
+              on:keydown={(e) => (e.key === 'Escape' || e.key === 'Enter') && closeUserMenu()}
+              role="button"
+              tabindex="0"
+              aria-label="Close user menu"
+            ></div>
             <div class="user-dropdown-card">
               <div class="dropdown-header">
                 <div class="user-name">{$currentUser.fullName || 'SatQuery Analyst'}</div>
@@ -583,7 +590,7 @@
       0 2px 6px rgba(0, 0, 0, 0.3);
   }
 
-  .chevron {
+  :global(.chevron) {
     color: rgba(255, 255, 255, 0.42);
 
     transition:
@@ -591,11 +598,11 @@
       transform 0.2s ease;
   }
 
-  .user-profile:hover .chevron {
+  .user-profile:hover :global(.chevron) {
     color: rgba(255, 255, 255, 0.8);
   }
 
-  .chevron.rotate {
+  :global(.chevron.rotate) {
     transform: rotate(180deg);
   }
 

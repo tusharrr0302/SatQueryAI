@@ -1,0 +1,70 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# SatQuery AI — Python Dependencies
+# ─────────────────────────────────────────────────────────────────────────────
+#
+# Install with:
+#   pip install -r requirements.txt
+#
+# Why each package is here:
+#   fastapi          — the HTTP API framework (like Express, but for Python)
+#   uvicorn          — the ASGI server that actually runs FastAPI
+#   openai           — GPT-OSS client; Groq is OpenAI-compatible so same SDK
+#   pydantic         — data validation (like Zod for Python)
+#   pydantic-settings— reads environment variables into typed config objects
+#   python-dotenv    — loads .env file on startup
+#   Pillow           — image loading and validation
+#   httpx            — async HTTP client (used internally by openai)
+#   loguru           — cleaner logging than Python's stdlib logging
+#   python-multipart — needed for FastAPI file upload support
+#
+# Dev/test dependencies:
+#   pytest           — test runner
+#   pytest-asyncio   — lets pytest run async test functions
+#   httpx            — also used as the test client for FastAPI
+# ─────────────────────────────────────────────────────────────────────────────
+
+# --- Core framework ---
+fastapi>=0.111.0
+uvicorn[standard]>=0.29.0
+
+# --- LLM client (works with OpenAI, Groq, Together, vLLM, Ollama) ---
+openai>=1.30.0
+
+# --- Data validation & config ---
+pydantic>=2.7.0
+pydantic-settings>=2.3.0
+python-dotenv>=1.0.1
+
+# --- Image handling ---
+Pillow>=10.3.0
+
+# --- HTTP client ---
+httpx>=0.27.0
+
+# --- Logging ---
+loguru>=0.7.2
+
+# --- File upload support in FastAPI ---
+python-multipart>=0.0.9
+
+# --- LangChain + LangGraph orchestration ---
+langchain>=0.3.0
+langchain-core>=0.3.0
+langchain-openai>=0.2.0
+langgraph>=0.2.0
+
+# --- Testing ---
+pytest>=8.2.0
+pytest-asyncio>=0.23.7
+
+# --- Async file operations (preprocessing pipeline) ---
+aiofiles>=23.2.1
+
+# --- Numerical computing & geospatial processing (Prithvi preprocessing layer) ---
+# numpy: multidimensional arrays, band stacking, normalization
+# scipy: bilinear spatial resampling for synthetic S2 band alignment
+# rasterio, affine: geospatial reading, CRS reprojection, and 30 m grid resampling
+numpy>=1.26.0
+scipy>=1.13.0
+rasterio>=1.3.0
+affine>=2.4.0

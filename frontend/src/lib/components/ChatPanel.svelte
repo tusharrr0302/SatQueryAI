@@ -9,7 +9,10 @@
     activeSidebarTab,
     liveAnalysisSteps,
     liveAnalysisStatus,
+    aiMode,
+    activeVisualizationPlan,
     type ChatMessage,
+    type AIMode,
   } from '../stores';
 
   import { parseMarkdown } from '../markdown';
@@ -25,6 +28,14 @@
     Layers,
     X,
     Sparkles,
+    ChevronDown,
+    ChevronUp,
+    ExternalLink,
+    Image as ImageIcon,
+    Sliders,
+    Globe,
+    HelpCircle,
+    Info,
   } from 'lucide-svelte';
 
   /* =========================================================
@@ -47,6 +58,46 @@
   let messagesContainer: HTMLElement;
   let isUploadingAsset = false;
   let uploadStatusText = '';
+  let expandedExplanationIds: Record<string, boolean> = {};
+  let expandedSections: Record<string, Record<string, boolean>> = {};
+
+  function toggleExplanation(id: string) {
+    expandedExplanationIds[id] = !expandedExplanationIds[id];
+    expandedExplanationIds = { ...expandedExplanationIds };
+  }
+
+  function toggleSection(msgId: string, section: string) {
+    if (!expandedSections[msgId]) expandedSections[msgId] = {};
+    expandedSections[msgId][section] = !expandedSections[msgId][section];
+    expandedSections = { ...expandedSections };
+  }
+
+  function isSectionOpen(msgId: string, section: string, isAdvanced: boolean): boolean {
+    if (expandedSections[msgId] && expandedSections[msgId][section] !== undefined) {
+      return expandedSections[msgId][section];
+    }
+    return isAdvanced;
+  }
+
+  function getRoleBadgeClass(role?: string): string {
+    switch (role) {
+      case 'primary_analysis': return 'role-primary';
+      case 'study_area': return 'role-study';
+      case 'comparison': return 'role-comparison';
+      case 'reference': return 'role-reference';
+      default: return 'role-default';
+    }
+  }
+
+  function getRoleBadgeLabel(role?: string): string {
+    switch (role) {
+      case 'primary_analysis': return 'PRIMARY ANALYSIS';
+      case 'study_area': return 'STUDY AREA';
+      case 'comparison': return 'COMPARISON';
+      case 'reference': return 'REFERENCE';
+      default: return (role || 'LAYER').toUpperCase();
+    }
+  }
 
   const sampleQueries = [
     'Show vegetation loss around Delhi',
@@ -151,6 +202,10 @@
       uploadStatusText = '';
     }
   }
+
+  $: activeVisibleLayersCount = ($activeDataLayers || []).filter(
+    (l) => l.visible !== false && l.type !== 'metadata'
+  ).length;
 </script>
 
 <div class="chat-workspace-panel">
@@ -167,14 +222,14 @@
     </div>
 
     <div class="header-actions">
-      {#if $activeDataLayers.length > 0}
+      {#if activeVisibleLayersCount > 0}
         <button
           class="layers-indicator-pill"
           on:click={() => ($activeSidebarTab = 'layers')}
           title="Open layer management drawer"
         >
           <Layers size={13} />
-          <span>{$activeDataLayers.length} active {$activeDataLayers.length === 1 ? 'layer' : 'layers'}</span>
+          <span>{activeVisibleLayersCount} active {activeVisibleLayersCount === 1 ? 'layer' : 'layers'}</span>
         </button>
       {/if}
 
@@ -216,6 +271,8 @@
     {/if}
 
     {#each $messages as msg (msg.id)}
+      {@const plan = msg.visualization_plan || msg.result?.visualization_plan}
+      {@const evidence = msg.web_evidence || msg.result?.web_evidence}
       {#if msg.role === 'user'}
         <!-- USER MESSAGE -->
         <div class="user-message-row">
@@ -230,9 +287,8 @@
           </div>
         </div>
       {:else}
-        <!-- ASSISTANT MESSAGE -->
         <div class="assistant-row">
-          {#if msg.result}
+          {#if msg.result && msg.result.analysis_type && msg.result.analysis_type !== 'conversational' && !msg.result.is_conversational && !msg.is_conversational}
             <AnalysisResult
               result={msg.result}
               content={msg.content}
@@ -249,10 +305,258 @@
                 <div class="assistant-identity">
                   <span class="assistant-name">SatQuery AI</span>
                   <span class="assistant-label">EO AGENT</span>
+                  {#if msg.ai_mode && msg.ai_mode !== 'auto'}
+                    <span class="ai-mode-badge">{msg.ai_mode.toUpperCase()} MODE</span>
+                  {/if}
                 </div>
               </div>
               <div class="assistant-content gpt-response-content">
                 {@html parseMarkdown(msg.content)}
+              </div>
+            </div>
+          {/if}
+
+          <!-- EARTH TELEMETRY & READING GUIDE PILL -->
+          {#if msg.visualization_required !== false && (plan || (msg.layers && msg.layers.length > 0))}
+            {@const layerList = plan?.active_layers || msg.layers || []}
+            {@const layerCount = layerList.length}
+            <div class="earth-telemetry-container">
+              <div class="earth-telemetry-pill">
+                <div class="pill-left">
+                  <Globe size={13} class="pill-globe-icon" />
+                  <span class="pill-main-label">Earth Telemetry</span>
+                  {#if layerCount > 0}
+                    <span class="pill-divider">•</span>
+                    <button
+                      class="pill-layer-badge"
+                      on:click={() => activeSidebarTab.set('layers')}
+                      title="Open Active Layers"
+                    >
+                      <Layers size={11} />
+                      <span>{layerCount} {layerCount === 1 ? 'layer' : 'layers'}</span>
+                    </button>
+                  {/if}
+                  {#if plan?.primary_visualization?.type}
+                    <span class="pill-vis-type">{plan.primary_visualization.type.replace(/_/g, ' ').toUpperCase()}</span>
+                  {/if}
+                </div>
+
+                <div class="pill-right">
+                  {#if layerCount > 0}
+                    <button
+                      class="pill-action-btn"
+                      on:click={() => activeSidebarTab.set('layers')}
+                      title="Inspect active layers on globe"
+                    >
+                      <Layers size={11} />
+                      <span>Layers</span>
+                    </button>
+                  {/if}
+                  {#if plan?.explanation}
+                    <button
+                      class="pill-action-btn reading-guide-btn"
+                      on:click={() => toggleExplanation(msg.id)}
+                      title="Explain how this visual evidence was composed"
+                    >
+                      <HelpCircle size={12} />
+                      <span>{expandedExplanationIds[msg.id] ? 'Hide Guide' : 'Reading Guide'}</span>
+                      {#if expandedExplanationIds[msg.id]}
+                        <ChevronUp size={12} />
+                      {:else}
+                        <ChevronDown size={12} />
+                      {/if}
+                    </button>
+                  {/if}
+                </div>
+              </div>
+
+              <!-- Collapsible Reading Guide (Authoritative Interpretation) -->
+              {#if expandedExplanationIds[msg.id] && plan?.explanation}
+                <div class="vis-guide-panel">
+                  {#if plan.explanation?.what_this_represents || plan.explanation?.plain_language_summary}
+                    <div class="vis-summary-banner">
+                      <span class="vis-summary-label">WHAT YOU'RE SEEING</span>
+                      <p class="vis-summary-text">{msg.ai_mode === 'beginner' && plan.explanation.plain_language_summary ? plan.explanation.plain_language_summary : (plan.explanation.what_this_represents || plan.primary_visualization?.title)}</p>
+                    </div>
+                  {/if}
+
+                  {#if plan.explanation?.key_observation}
+                    <div class="vis-key-obs-banner">
+                      <span class="vis-key-obs-label">KEY OBSERVATION</span>
+                      <p class="vis-key-obs-text">{plan.explanation.key_observation}</p>
+                    </div>
+                  {/if}
+
+                  <!-- Progressive Disclosure Sections -->
+                  <div class="vis-explanation-progressive">
+                    <!-- Section 1: How to read this -->
+                    <div class="disclosure-card">
+                      <button
+                        class="disclosure-toggle"
+                        on:click={() => toggleSection(msg.id, 'how_to_read')}
+                        aria-expanded={isSectionOpen(msg.id, 'how_to_read', msg.ai_mode === 'advanced')}
+                      >
+                        <span class="disclosure-title">How to read this</span>
+                        {#if isSectionOpen(msg.id, 'how_to_read', msg.ai_mode === 'advanced')}
+                          <ChevronUp size={13} />
+                        {:else}
+                          <ChevronDown size={13} />
+                        {/if}
+                      </button>
+                      {#if isSectionOpen(msg.id, 'how_to_read', msg.ai_mode === 'advanced')}
+                        <div class="disclosure-content">
+                          {#if plan.explanation.visual_form}
+                            <div class="disclosure-item"><span class="item-tag">VISUAL FORM</span> <p>{plan.explanation.visual_form}</p></div>
+                          {/if}
+                          {#if plan.explanation.palette_and_scale}
+                            <div class="disclosure-item"><span class="item-tag">PALETTE & SCALE</span> <p>{plan.explanation.palette_and_scale}</p></div>
+                          {/if}
+                          {#if plan.explanation.critical_thresholds}
+                            <div class="disclosure-item"><span class="item-tag">CRITICAL THRESHOLDS</span> <p>{plan.explanation.critical_thresholds}</p></div>
+                          {/if}
+                          {#if plan.explanation.primary_metric}
+                            <div class="disclosure-item"><span class="item-tag">PRIMARY METRIC</span> <p>{plan.explanation.primary_metric}</p></div>
+                          {/if}
+                        </div>
+                      {/if}
+                    </div>
+
+                    <!-- Section 2: Why this view -->
+                    <div class="disclosure-card">
+                      <button
+                        class="disclosure-toggle"
+                        on:click={() => toggleSection(msg.id, 'why_view')}
+                        aria-expanded={isSectionOpen(msg.id, 'why_view', msg.ai_mode === 'advanced')}
+                      >
+                        <span class="disclosure-title">Why this view</span>
+                        {#if isSectionOpen(msg.id, 'why_view', msg.ai_mode === 'advanced')}
+                          <ChevronUp size={13} />
+                        {:else}
+                          <ChevronDown size={13} />
+                        {/if}
+                      </button>
+                      {#if isSectionOpen(msg.id, 'why_view', msg.ai_mode === 'advanced')}
+                        <div class="disclosure-content">
+                          {#if plan.explanation.why_chosen}
+                            <div class="disclosure-item"><span class="item-tag">ANALYTICAL REASON</span> <p>{plan.explanation.why_chosen}</p></div>
+                          {/if}
+                          {#if plan.explanation.visual_inferences}
+                            <div class="disclosure-item"><span class="item-tag">INFERENCES</span> <p>{plan.explanation.visual_inferences}</p></div>
+                          {/if}
+                          {#if plan.explanation.spatial_context}
+                            <div class="disclosure-item"><span class="item-tag">SPATIAL CONTEXT</span> <p>{plan.explanation.spatial_context}</p></div>
+                          {/if}
+                        </div>
+                      {/if}
+                    </div>
+
+                    <!-- Section 3: Data & method -->
+                    <div class="disclosure-card">
+                      <button
+                        class="disclosure-toggle"
+                        on:click={() => toggleSection(msg.id, 'data_method')}
+                        aria-expanded={isSectionOpen(msg.id, 'data_method', msg.ai_mode === 'advanced')}
+                      >
+                        <span class="disclosure-title">Data & method</span>
+                        {#if isSectionOpen(msg.id, 'data_method', msg.ai_mode === 'advanced')}
+                          <ChevronUp size={13} />
+                        {:else}
+                          <ChevronDown size={13} />
+                        {/if}
+                      </button>
+                      {#if isSectionOpen(msg.id, 'data_method', msg.ai_mode === 'advanced')}
+                        <div class="disclosure-content">
+                          {#if plan.explanation.provenance_and_sensor}
+                            <div class="disclosure-item"><span class="item-tag">SENSOR TELEMETRY</span> <p>{plan.explanation.provenance_and_sensor}</p></div>
+                          {/if}
+                          {#if plan.explanation.baseline_comparison}
+                            <div class="disclosure-item"><span class="item-tag">BASELINE / EPOCHS</span> <p>{plan.explanation.baseline_comparison}</p></div>
+                          {/if}
+                          {#if plan.explanation.technical_summary}
+                            <div class="disclosure-item technical-callout"><span class="item-tag">TECHNICAL FORMULATION</span> <p>{plan.explanation.technical_summary}</p></div>
+                          {/if}
+                        </div>
+                      {/if}
+                    </div>
+
+                    <!-- Section 4: Limitations & caveats -->
+                    <div class="disclosure-card">
+                      <button
+                        class="disclosure-toggle"
+                        on:click={() => toggleSection(msg.id, 'limitations')}
+                        aria-expanded={isSectionOpen(msg.id, 'limitations', msg.ai_mode === 'advanced')}
+                      >
+                        <span class="disclosure-title">Limitations & caveats</span>
+                        {#if isSectionOpen(msg.id, 'limitations', msg.ai_mode === 'advanced')}
+                          <ChevronUp size={13} />
+                        {:else}
+                          <ChevronDown size={13} />
+                        {/if}
+                      </button>
+                      {#if isSectionOpen(msg.id, 'limitations', msg.ai_mode === 'advanced')}
+                        <div class="disclosure-content">
+                          {#if plan.explanation.limitations}
+                            <div class="disclosure-item"><span class="item-tag">CAVEATS & CONSTRAINTS</span> <p>{plan.explanation.limitations}</p></div>
+                          {/if}
+                        </div>
+                      {/if}
+                    </div>
+                  </div>
+                </div>
+              {/if}
+            </div>
+          {/if}
+
+          <!-- GROUNDED WEB EVIDENCE CARD -->
+          {#if evidence && evidence.length > 0}
+            <div class="web-evidence-card">
+              <div class="evidence-header">
+                <Globe size={13} class="evidence-icon" />
+                <span class="evidence-title">GROUNDED WEB EVIDENCE & EXTERNAL REFERENCE</span>
+              </div>
+              <div class="evidence-items-list">
+                {#each evidence as item}
+                  {#if item.is_reference_photo}
+                    <div class="ref-photo-card">
+                      <div class="ref-photo-badge-bar">
+                        <span class="ref-photo-badge">
+                          <ImageIcon size={11} />
+                          Ground Reference Photo (Not Satellite Telemetry)
+                        </span>
+                        {#if item.source_domain}
+                          <span class="ref-source-domain">{item.source_domain}</span>
+                        {/if}
+                      </div>
+                      <div class="ref-photo-content">
+                        {#if item.thumbnail_url}
+                          <img src={item.thumbnail_url} alt={item.title} class="ref-thumb-img" />
+                        {/if}
+                        <div class="ref-photo-details">
+                          <h5 class="ref-photo-title">{item.title}</h5>
+                          <p class="ref-photo-snippet">{item.snippet}</p>
+                          <a href={item.url} target="_blank" rel="noopener noreferrer" class="ref-source-link">
+                            <span>{item.attribution || item.url}</span>
+                            <ExternalLink size={11} />
+                          </a>
+                        </div>
+                      </div>
+                    </div>
+                  {:else}
+                    <div class="evidence-text-card">
+                      <div class="evidence-text-top">
+                        <span class="evidence-item-title">{item.title}</span>
+                        {#if item.source_domain}
+                          <span class="ref-source-domain">{item.source_domain}</span>
+                        {/if}
+                      </div>
+                      <p class="evidence-snippet">{item.snippet}</p>
+                      <a href={item.url} target="_blank" rel="noopener noreferrer" class="ref-source-link">
+                        <span>{item.attribution || item.url}</span>
+                        <ExternalLink size={11} />
+                      </a>
+                    </div>
+                  {/if}
+                {/each}
               </div>
             </div>
           {/if}
@@ -321,10 +625,25 @@
       </div>
     {/if}
 
-    <div class="input-hint">
-      <span>ENTER TO SEND</span>
-      <span class="hint-divider">•</span>
-      <span>SHIFT + ENTER FOR NEW LINE</span>
+    <div class="input-controls-row">
+      <div class="ai-mode-selector-wrap">
+        <label for="ai-mode-select" class="ai-mode-label">
+          <Sliders size={12} strokeWidth={1.7} />
+          <span>AI MODE:</span>
+        </label>
+        <select id="ai-mode-select" bind:value={$aiMode} class="ai-mode-select" disabled={isAnalyzingProp}>
+          <option value="auto">Auto (Balanced)</option>
+          <option value="beginner">Beginner (Plain Language)</option>
+          <option value="intermediate">Intermediate (Scientific)</option>
+          <option value="advanced">Advanced (Mathematical & Research)</option>
+        </select>
+      </div>
+
+      <div class="input-hint">
+        <span>ENTER TO SEND</span>
+        <span class="hint-divider">•</span>
+        <span>SHIFT + ENTER FOR NEW LINE</span>
+      </div>
     </div>
 
     <div class="input-bar">
@@ -1176,42 +1495,7 @@
   }
 
 
-  .user-avatar {
 
-    width: 30px;
-
-    height: 30px;
-
-    flex-shrink: 0;
-
-    display: flex;
-
-    align-items: center;
-
-    justify-content: center;
-
-    border-radius: 50%;
-
-    background:
-      rgba(255,255,255,0.065);
-
-    border:
-      1px solid
-      rgba(255,255,255,0.13);
-
-    color:
-      rgba(255,255,255,0.70);
-
-    font-size: 9px;
-
-    font-weight: 600;
-
-    letter-spacing: 0.03em;
-
-    box-shadow:
-      inset 0 1px 0
-      rgba(255,255,255,0.08);
-  }
 
 
   /* =========================================================
@@ -1479,146 +1763,7 @@
   }
 
 
-  /* =========================================================
-     ANALYZING
-     ========================================================= */
 
-  .analyzing-message {
-
-    width: 100%;
-
-    max-width: 620px;
-
-    display: flex;
-
-    align-items: center;
-
-    gap: 12px;
-
-    padding:
-      13px 15px;
-
-    border:
-      1px solid
-      rgba(255,255,255,0.08);
-
-    border-radius: 12px;
-
-    background:
-      rgba(255,255,255,0.025);
-
-    box-shadow:
-      inset 0 1px 0
-      rgba(255,255,255,0.04);
-
-    backdrop-filter:
-      blur(15px);
-  }
-
-
-  .analysis-loader {
-
-    width: 28px;
-
-    height: 28px;
-
-    flex-shrink: 0;
-
-    display: flex;
-
-    align-items: center;
-
-    justify-content: center;
-
-    gap: 3px;
-
-    border-radius: 8px;
-
-    background:
-      rgba(255,255,255,0.05);
-
-    border:
-      1px solid
-      rgba(255,255,255,0.08);
-  }
-
-
-  .analysis-loader span {
-
-    width: 3px;
-
-    height: 3px;
-
-    border-radius: 50%;
-
-    background:
-      rgba(255,255,255,0.75);
-
-    animation:
-      loadingDot 1.1s
-      ease-in-out
-      infinite;
-  }
-
-
-  .analysis-loader span:nth-child(2) {
-
-    animation-delay:
-      0.15s;
-  }
-
-
-  .analysis-loader span:nth-child(3) {
-
-    animation-delay:
-      0.3s;
-  }
-
-
-  @keyframes loadingDot {
-
-    0%,
-    60%,
-    100% {
-      opacity: 0.25;
-      transform: translateY(0);
-    }
-
-    30% {
-      opacity: 1;
-      transform: translateY(-3px);
-    }
-  }
-
-
-  .analyzing-copy {
-
-    display: flex;
-
-    flex-direction: column;
-
-    gap: 3px;
-  }
-
-
-  .analyzing-title {
-
-    color:
-      rgba(255,255,255,0.72);
-
-    font-size: 11px;
-
-    font-weight: 500;
-  }
-
-
-  .analyzing-subtitle {
-
-    color:
-      rgba(255,255,255,0.30);
-
-    font-size: 9px;
-  }
 
 
   /* =========================================================
@@ -2103,6 +2248,473 @@
       font-size: 12px;
     }
 
+  /* =========================================================
+     AI MODE & INPUT CONTROLS
+     ========================================================= */
+
+  .input-controls-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 4px 6px;
+    gap: 8px;
   }
 
+  .ai-mode-selector-wrap {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    background: rgba(255, 255, 255, 0.04);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 6px;
+    padding: 2px 8px;
+  }
+
+  .ai-mode-label {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 10px;
+    font-weight: 600;
+    color: rgba(255, 255, 255, 0.5);
+    letter-spacing: 0.04em;
+    cursor: pointer;
+  }
+
+  .ai-mode-select {
+    background: transparent;
+    border: none;
+    color: #48bb78;
+    font-size: 11px;
+    font-weight: 600;
+    font-family: var(--font-ui);
+    cursor: pointer;
+    outline: none;
+    padding: 2px 4px;
+  }
+
+  .ai-mode-select option {
+    background: #111;
+    color: #eee;
+  }
+
+  .ai-mode-badge {
+    display: inline-block;
+    background: rgba(56, 178, 172, 0.12);
+    border: 1px solid rgba(56, 178, 172, 0.25);
+    color: #38b2ac;
+    font-size: 9px;
+    font-weight: 700;
+    padding: 2px 6px;
+    border-radius: 4px;
+    letter-spacing: 0.05em;
+  }
+
+  /* =========================================================
+     EARTH TELEMETRY PILL & READING GUIDE
+     ========================================================= */
+
+  .earth-telemetry-container {
+    margin-top: 8px;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+
+  .earth-telemetry-pill {
+    display: inline-flex;
+    align-items: center;
+    justify-content: space-between;
+    background: rgba(18, 24, 34, 0.7);
+    border: 1px solid rgba(255, 255, 255, 0.09);
+    border-radius: 9999px;
+    padding: 4px 10px 4px 8px;
+    gap: 10px;
+    font-size: 11px;
+    backdrop-filter: blur(8px);
+    width: fit-content;
+    max-width: 100%;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.35);
+  }
+
+  .pill-left {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    color: #94a3b8;
+  }
+
+  :global(.pill-globe-icon) {
+    color: #38bdf8;
+  }
+
+  .pill-main-label {
+    font-weight: 600;
+    color: #e2e8f0;
+    font-size: 11px;
+    letter-spacing: 0.01em;
+  }
+
+  .pill-divider {
+    color: rgba(255, 255, 255, 0.2);
+    font-size: 10px;
+  }
+
+  .pill-layer-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    background: rgba(255, 255, 255, 0.06);
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    border-radius: 9999px;
+    padding: 1px 7px;
+    font-size: 10px;
+    font-weight: 500;
+    color: #cbd5e1;
+    cursor: pointer;
+    transition: all 0.15s ease;
+  }
+
+  .pill-layer-badge:hover {
+    background: rgba(255, 255, 255, 0.12);
+    color: #ffffff;
+    border-color: rgba(255, 255, 255, 0.2);
+  }
+
+  .pill-vis-type {
+    font-size: 9px;
+    font-weight: 700;
+    padding: 1px 6px;
+    border-radius: 4px;
+    background: rgba(56, 189, 248, 0.1);
+    color: #38bdf8;
+    border: 1px solid rgba(56, 189, 248, 0.2);
+    letter-spacing: 0.04em;
+  }
+
+  .pill-right {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+
+  .pill-action-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 10.5px;
+    font-weight: 500;
+    background: transparent;
+    border: none;
+    color: #94a3b8;
+    padding: 2px 6px;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: all 0.15s ease;
+  }
+
+  .pill-action-btn:hover {
+    color: #e2e8f0;
+    background: rgba(255, 255, 255, 0.06);
+  }
+
+  .reading-guide-btn {
+    color: #38bdf8;
+  }
+
+  .reading-guide-btn:hover {
+    color: #7dd3fc;
+    background: rgba(56, 189, 248, 0.1);
+  }
+
+  .vis-guide-panel {
+    background: rgba(14, 18, 26, 0.6);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 8px;
+    padding: 10px 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+
+
+  /* =========================================================
+     PROGRESSIVE DISCLOSURE VISUALIZATION EXPLANATION
+     ========================================================= */
+
+  .vis-summary-banner {
+    background: rgba(255, 255, 255, 0.03);
+    border-left: 3px solid #4299e1;
+    border-radius: 4px;
+    padding: 6px 10px;
+  }
+
+  .vis-summary-label {
+    display: block;
+    font-size: 8.5px;
+    font-weight: 700;
+    color: #63b3ed;
+    letter-spacing: 0.05em;
+    margin-bottom: 2px;
+  }
+
+  .vis-summary-text {
+    margin: 0;
+    font-size: 11.5px;
+    color: #e2e8f0;
+    line-height: 1.4;
+  }
+
+  .vis-key-obs-banner {
+    background: rgba(72, 187, 120, 0.06);
+    border-left: 3px solid #48bb78;
+    border-radius: 4px;
+    padding: 6px 10px;
+  }
+
+  .vis-key-obs-label {
+    display: block;
+    font-size: 8.5px;
+    font-weight: 700;
+    color: #48bb78;
+    letter-spacing: 0.05em;
+    margin-bottom: 2px;
+  }
+
+  .vis-key-obs-text {
+    margin: 0;
+    font-size: 11.5px;
+    color: #e2e8f0;
+    line-height: 1.4;
+  }
+
+  .vis-explanation-progressive {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    margin-top: 4px;
+  }
+
+  .disclosure-card {
+    background: rgba(0, 0, 0, 0.35);
+    border: 1px solid rgba(255, 255, 255, 0.06);
+    border-radius: 6px;
+    overflow: hidden;
+  }
+
+  .disclosure-toggle {
+    width: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 7px 10px;
+    background: transparent;
+    border: none;
+    color: #cbd5e0;
+    font-size: 11px;
+    font-weight: 600;
+    cursor: pointer;
+    text-align: left;
+    transition: background 0.15s ease;
+  }
+
+  .disclosure-toggle:hover {
+    background: rgba(255, 255, 255, 0.04);
+    color: #edf2f7;
+  }
+
+  .disclosure-title {
+    color: #63b3ed;
+  }
+
+  .disclosure-content {
+    padding: 8px 10px;
+    border-top: 1px solid rgba(255, 255, 255, 0.04);
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    font-size: 11px;
+  }
+
+  .disclosure-item {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+  }
+
+  .disclosure-item p {
+    margin: 0;
+    color: #e2e8f0;
+    line-height: 1.4;
+  }
+
+  .disclosure-item .item-tag {
+    font-size: 8px;
+    font-weight: 700;
+    color: rgba(255, 255, 255, 0.45);
+    letter-spacing: 0.05em;
+  }
+
+  .technical-callout {
+    background: rgba(147, 51, 234, 0.08);
+    border-left: 2px solid #a855f7;
+    padding: 4px 6px;
+    border-radius: 3px;
+  }
+
+  /* =========================================================
+     GROUNDED WEB EVIDENCE
+     ========================================================= */
+
+  .web-evidence-card {
+    background: rgba(14, 18, 26, 0.5);
+    border: 1px solid rgba(255, 255, 255, 0.07);
+    border-radius: 8px;
+    padding: 10px 12px;
+    margin-top: 10px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .evidence-header {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+
+  .evidence-icon {
+    color: #38b2ac;
+  }
+
+  .evidence-title {
+    font-size: 9.5px;
+    font-weight: 700;
+    letter-spacing: 0.05em;
+    color: #38b2ac;
+  }
+
+  .evidence-items-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .ref-photo-card {
+    background: rgba(0, 0, 0, 0.35);
+    border: 1px solid rgba(255, 255, 255, 0.06);
+    border-radius: 6px;
+    padding: 8px;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+
+  .ref-photo-badge-bar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+  }
+
+  .ref-photo-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    background: rgba(246, 173, 85, 0.15);
+    border: 1px solid rgba(246, 173, 85, 0.3);
+    color: #f6ad55;
+    font-size: 9px;
+    font-weight: 700;
+    padding: 2px 6px;
+    border-radius: 4px;
+    letter-spacing: 0.04em;
+  }
+
+  .ref-source-domain {
+    font-size: 9px;
+    color: rgba(255, 255, 255, 0.4);
+  }
+
+  .ref-photo-content {
+    display: flex;
+    gap: 10px;
+    align-items: flex-start;
+  }
+
+  .ref-thumb-img {
+    width: 72px;
+    height: 72px;
+    object-fit: cover;
+    border-radius: 4px;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    flex-shrink: 0;
+  }
+
+  .ref-photo-details {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+  }
+
+  .ref-photo-title {
+    margin: 0;
+    font-size: 11.5px;
+    font-weight: 600;
+    color: #e2e8f0;
+  }
+
+  .ref-photo-snippet {
+    margin: 0;
+    font-size: 10.5px;
+    color: rgba(255, 255, 255, 0.65);
+    line-height: 1.35;
+  }
+
+  .ref-source-link {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 10px;
+    color: #63b3ed;
+    text-decoration: none;
+    margin-top: 2px;
+  }
+
+  .ref-source-link:hover {
+    text-decoration: underline;
+  }
+
+  .evidence-text-card {
+    background: rgba(0, 0, 0, 0.25);
+    border: 1px solid rgba(255, 255, 255, 0.04);
+    border-radius: 6px;
+    padding: 8px 10px;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+
+  .evidence-text-top {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+  }
+
+  .evidence-item-title {
+    font-size: 11px;
+    font-weight: 600;
+    color: #edf2f7;
+  }
+
+  .evidence-snippet {
+    margin: 0;
+    font-size: 10.5px;
+    color: rgba(255, 255, 255, 0.65);
+    line-height: 1.35;
+  }
+}
 </style>
